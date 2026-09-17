@@ -1,0 +1,24 @@
+======================
+plan.txt
+	line 1: TODO extractor
+	line 8: find TODO
+	line 9: 
+		if line_count:  # e.g. TODO{3} ...
+		  read next n lines
+		append result to TODO.md file
+	line 17: else -> save to TODO.md
+	line 21: save TODO.md in path/cwd
+	line 24: 
+		TODO{5}
+		by-default search for TODO, FIXME
+		user can pass custom (varargs) -> WARN, REVISIT
+
+		if not line_count -> save only line with TODO (full line or just TODO comment?)
+	line 29: optionally - pass flag to skips code lines/snippets -> save only TODO comments
+	line 33: + TODO comment + optional snippet (+ optional []  to conveniently add [x] or [DONE] later)
+======================
+tdx.py
+	line 39: out="TODO-plain.txt",
+	line 86: # //if line not contains "TODO", "FIXME" or --tokens:
+	line 87: if (idx := line.find("TODO")) == -1:
+	line 119: start = idx + len("TODO")

@@ -1,0 +1,87 @@
+def main():
+	resolve args
+
+	if path not exists: 
+		raise Error
+
+	if path is file:
+		process_file(path)
+		exit(0)
+		
+	if path is dir:
+		curr_depth = 0 // or 1??
+		process_dir(path, curr_depth)
+
+
+def process_file(path, out):
+	if path in --exclude: // check for globs
+		return
+
+	open path
+	
+	i = 0 // lines count
+	header_added = False
+	try:
+		while line := next(f):
+			i += 1
+			//if line not contains "TODO", "FIXME" or --tokens:
+			if idx := line.index_of("TODO") == -1
+				continue
+			
+			// NB: we also need to know which token was found -> we use it's size inside parse_snippet_count()
+			
+			if header_added is False:
+				path = fullpath if full_path else path
+				out.write(path)
+				header_added = True
+
+			if --short:
+				line = line[idx:]
+			else:
+				count := parse_snippet_count(line, idx)
+				for 0..count:
+					line += next(f)
+					i += 1
+
+			out.write("line {i}:")
+			out.write(dedent(line))
+	except StopIteration:
+		...
+
+def parse_snippet_count(line, idx):
+	start = idx + len("TODO")
+	if line[start] != "{":
+		return 1
+	
+	// use built-in to find end index
+	end = -1
+	for j, ch in enumerate(line[start+1:]):
+		if ch == "}":
+			end = j
+			break
+	
+	if end == -1:
+		raise ValueError
+	
+	try:
+		count = int(line[start+1:end]))
+	execept ValueError:
+		exit(1)
+	
+	return count
+	
+
+def process_dir(path, curr_depth):
+	if path in --exclude: // check for globs
+		return
+
+	curr_depth += 1
+	if --max-depth and curr_depth > --max_depth:
+		return
+	
+	for file in curr files:
+		process_file(file)
+		
+	if --recursive:
+		for dir in curr dirs:
+			process_dir(dir, curr_depth)
