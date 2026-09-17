@@ -9,7 +9,7 @@ read files:
     if line_count:  # e.g. TODO{3} ...
       read next n lines
     append result to TODO.md file
-    
+
 if --recursive -> step into nested dirs and repeat
 if --max-depth -> stop when necessary
 
@@ -17,9 +17,9 @@ if --out -> save to "out" file
 else -> save to TODO.md
 if file exists -> override
   unless --append passed
-  
+
 save TODO.md in path/cwd
-(what of --out is full_path, not just file name??)
+(what of --out is full_path, not just file name??)   // warning
 
 TODO{5}
 by-default search for TODO, FIXME
@@ -32,12 +32,12 @@ each pargraph starts with path:line_number e.g. ./foo/bar/fizz.rs:35
 (full path or relative? from cwd)
 + TODO comment + optional snippet (+ optional []  to conveniently add [x] or [DONE] later)
 
---follow-symlinks -> by default false
+--follow-symlinks -> by default false FIXME{2}
 
 add colors inside outfile e.g. red/blue for paths??
 
 While reading file -> read buffered line by line, keep curr_line counter (needed for output)
-
+@WARN{3}
 What if we can optionally just go through files and log analysis in terminal without saving it
 - or both/ tee shell+save ??
 

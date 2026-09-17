@@ -1,44 +1,56 @@
 #! /usr/bin/python3
 
 
+import re
+from argparse import ArgumentParser
 from pathlib import Path
 from textwrap import dedent, indent
+from typing import TextIO
+
+DEFAULT_MAX_DEPTH = float("inf")
+DEFAULT_OUT = "TODO"
 
 
 class Writer:
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.opened = False
-        self.file = None
+        self.file: TextIO | None = None
 
-    def open(self):
-        if not self.opened:
+    def ensure_open(self) -> None:
+        # lazy open out file
+        if self.file is None:
             self.file = self.path.open("w")
-            self.opened = True
 
-    def close(self):
-        if self.opened and self.file:  # fixme
+    def close(self) -> None:
+        if self.file:
             self.file.close()
-            self.opened = False
+            self.file = None
 
-    def write(self, line: str):
-        if self.file:  # fixme
-            self.file.write(line)
+    def write_header(self, path: str) -> None:
+        self.ensure_open()
+        self.file.write("======================\n")
+        self.file.write(f"{path}\n")
+
+    def write_entry(self, line: str) -> None:
+        self.ensure_open()
+        self.file.write(line)
 
 
-class Processor:
+class Extractor:
     def __init__(
         self,
-        exclude=None,
-        tokens=None,
-        full_path=False, # default values can be set in arg_parser before this step
-        short=True,
-        recursive=True,
-        max_depth=float("inf"),
-        out="TODO.txt",
-    ) -> None:  # fix default max_depth and out
-        self.exclude = exclude or {".idea", ".venv", ".zed"}  # fixme
-        self.tokens = tokens or {}
+        path,
+        exclude: list[str] | None = None,
+        tokens: list[str] | None = None,
+        full_path: bool = False,
+        short: bool = False,
+        recursive: bool = False,
+        max_depth: float = DEFAULT_MAX_DEPTH,
+        out: str = DEFAULT_OUT,
+    ) -> None:
+        self.path = path
+        self.exclude = exclude or []
+        self.tokens = tokens or []
         self.full_path = full_path
         self.short = short
         self.recursive = recursive
@@ -46,8 +58,8 @@ class Processor:
         self.out = self.prepare_out(out)
 
     @staticmethod
-    def prepare_out(name) -> Writer:
-        path = Path(name)  # actually from args
+    def prepare_out(name: str) -> Writer:
+        path = Path(name)
         if not path.exists:
             raise FileNotFoundError("path not found")
 
@@ -55,72 +67,69 @@ class Processor:
             raise TypeError("out path must file not dir")
         return Writer(path)
 
-    def run(self):
-        path = Path(".")  # actually from args
+    def run(self) -> None:
+        path = Path(self.path)
         if not path.exists:
-            raise FileNotFoundError("path not found")
+            raise FileNotFoundError(f"{path} not found")
 
         try:
             if path.is_file():
                 self.process_file(path)
-                # exit(0)
-
-            if path.is_dir():
+            elif path.is_dir():
                 self.process_dir(path, depth=0)
-        # except (Exception, KeyboardInterrupt) as e:
-        #     print(e)
+            else:
+                print(f"{path} must be path to file or dir")
+        # OSError might be raised from path.iterdir, also catches FileNotFoundError
+        except (OSError, ValueError, TypeError, RuntimeError) as e:  # revisit
+            print(e)
+        except KeyboardInterrupt:
+            pass
         finally:
-            if not self.out.opened:
-                self.out.close()
+            self.out.close()
 
-    def process_file(self, path: Path):
+    def process_file(self, path: Path) -> None:
         if path in self.exclude or path.name.startswith("TODO"):  # check for globs
             return
 
         with path.open() as f:
-            i = 0  # lines count
+            lines_count = 0
             header_added = False
             while line := f.readline():
-                i += 1
-                # //if line not contains "TODO", "FIXME" or --tokens:
-                if (idx := line.find("TODO")) == -1:
+                lines_count += 1
+
+                # pattern = "|".join(re.escape(tok) for tok in self.tokens # do we need to escape specail chars in tok
+                pattern = rf"\b(?:{"|".join(self.tokens)})\b"
+                if not (match := re.search(pattern, line, re.IGNORECASE)):
                     continue
-
-                # // NB: we also need to know which token was found -> we use it's size inside parse_snippet_count()
-
-                # lazy open out file
-                if not self.out.opened:
-                    self.out.open()
+                token = match.group()
+                idx = match.start()
 
                 if not header_added:
-                    self.out.write("======================\n")
-                    self.out.write(f"{self.prepare_path_name(path)}\n")
+                    self.out.write_header(self.prepare_path_name(path))
                     header_added = True
 
-                line_num = i
                 if self.short:
                     line = line[idx:]
+                    self.out.write_entry(f"\tline {lines_count}: ")
+                    self.out.write_entry(line)
+                    continue
+
+                display_line_num = lines_count
+                for _ in range(1, self.get_snippet_count(line, start=idx + len(token))):
+                    line += f.readline()
+                    lines_count += 1
+
+                if not line.endswith("\n"):
+                    line += "\n"  # this is the last or only line in the file
+
+                self.out.write_entry(f"\tline {display_line_num}: ")
+                if display_line_num != lines_count:  # add full snippets
+                    self.out.write_entry(indent(dedent("\n" + line), "\t\t"))
                 else:
-                    for _ in range(1, self.get_snippet_count(line, idx)):
-                        line += f.readline()
-                        i += 1
-
-                    if not line.endswith("\n"):
-                        # if this is the last line of the file
-                        line += "\n"
-
-                    if line_num != i:
-                        # prepare snippet
-                        line = indent(dedent("\n" + line), "\t\t")
-                    else:
-                        line = dedent(line)
-
-                self.out.write(f"\tline {line_num}: ")
-                self.out.write(line)
+                    self.out.write_entry(dedent(line))
 
     @staticmethod
-    def get_snippet_count(line: str, idx: int) -> int:
-        start = idx + len("TODO")
+    def get_snippet_count(line: str, start: int) -> int:
         if line[start] != "{":
             return 1
 
@@ -134,12 +143,12 @@ class Processor:
 
     def prepare_path_name(self, path: Path) -> str:
         if self.full_path:
-            return str(path.resolve())  # NB: use for symlinks
+            return str(path.absolute())  # NB: use resolve() for symlinks
         if self.recursive:
             return str(path)
         return path.name
 
-    def process_dir(self, path: Path, depth: int):
+    def process_dir(self, path: Path, depth: int) -> None:
         if path.name in self.exclude or path.name.startswith(
             (".", "_")
         ):  # check for globs
@@ -148,18 +157,61 @@ class Processor:
         if depth > self.max_depth:
             return
 
-        for entry in path.iterdir():  # handle error? (OSError)
+        dirs = []
+        for entry in path.iterdir():
             if entry.is_file():
                 self.process_file(entry)
-
             elif self.recursive and entry.is_dir():
-                self.process_dir(entry, depth + 1)
+                dirs.append(entry)
+
+        if dirs:
+            for dir_ in dirs:
+                self.process_dir(dir_, depth + 1)
 
 
-def main():
-    # resolve args
-    args = []
-    Processor(*args).run()
+def main() -> None:
+    parser = ArgumentParser()
+    # add types for args, fix help msgs
+    parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
+    parser.add_argument(
+        "-x",
+        "--exclude",
+        nargs="*",
+        default=[],
+        help="list of dirs/files to exclude - also works with glob patterns",
+    )
+    parser.add_argument(
+        "-t",
+        "--tokens",
+        nargs="*",
+        default=[],
+        help="list of tokens to search for (besides the default TODO, FIXME) e.g. WARN, REVISIT",
+    )
+    parser.add_argument(
+        "-f", "--full_path", action="store_true", help="display absolute dir/file path"
+    )
+    parser.add_argument(
+        "-s",
+        "--short",
+        action="store_true",
+        help="display only tokens messages - ignores longer snippets",
+    )
+    parser.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help="traverse given dir path recursively",
+    )
+    parser.add_argument(
+        "-d",
+        "--max_depth",
+        default=DEFAULT_MAX_DEPTH,
+        help="maximum depth of dir traversal - used with --recursive flag",
+    )
+    parser.add_argument("-o", "--out", default=DEFAULT_OUT, help="path to output file")
+
+    args = parser.parse_args()
+    Extractor(**vars(args)).run()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,34 @@
+======================
+plan.txt
+	line 1: TODO extractor
+	line 8: find TODO
+	line 9: 
+		if line_count:  # e.g. TODO{3} ...
+		  read next n lines
+		append result to TODO.md file
+	line 17: else -> save to TODO.md
+	line 21: save TODO.md in path/cwd
+	line 24: 
+		TODO{5}
+		by-default search for TODO, FIXME
+		user can pass custom (varargs) -> WARN, REVISIT
+
+		if not line_count -> save only line with TODO (full line or just TODO comment?)
+	line 29: optionally - pass flag to skips code lines/snippets -> save only TODO comments
+	line 33: + TODO comment + optional snippet (+ optional []  to conveniently add [x] or [DONE] later)
+	line 40: 
+		@WARN{3}
+		What if we can optionally just go through files and log analysis in terminal without saving it
+		- or both/ tee shell+save ??
+	line 49: - tokens (e.g. WARN, DEFER, REVISIT) (decide on name?!)
+======================
+tdx.py
+	line 11: DEFAULT_OUT = "TODO"
+	line 91: if path in self.exclude or path.name.startswith("TODO"):  # check for globs
+	line 174: # add types for args, fix help msgs
+	line 188: help="list of tokens to search for (besides the default TODO, FIXME) e.g. WARN, REVISIT",
+======================
+text/algo.txt
+	line 27: //if line not contains "TODO", "FIXME" or --tokens:
+	line 28: if idx := line.index_of("TODO") == -1
+	line 52: start = idx + len("TODO")
