@@ -31,8 +31,9 @@ class Writer:
         self.file.write("======================\n")
         self.file.write(f"{path}\n")
 
-    def write_entry(self, line: str) -> None:
+    def write_entry(self, lines_count: int, line: str) -> None:
         self.ensure_open()
+        self.file.write(f"\tline {lines_count}: ")
         self.file.write(line)
 
 
@@ -98,7 +99,7 @@ class Extractor:
                 lines_count += 1
 
                 # pattern = "|".join(re.escape(tok) for tok in self.tokens # do we need to escape specail chars in tok
-                pattern = rf"\b(?:{"|".join(self.tokens)})\b"
+                pattern = rf"\b(?:{'|'.join(self.tokens)})\b"
                 if not (match := re.search(pattern, line, re.IGNORECASE)):
                     continue
                 token = match.group()
@@ -110,8 +111,7 @@ class Extractor:
 
                 if self.short:
                     line = line[idx:]
-                    self.out.write_entry(f"\tline {lines_count}: ")
-                    self.out.write_entry(line)
+                    self.out.write_entry(lines_count, line)
                     continue
 
                 display_line_num = lines_count
@@ -122,11 +122,11 @@ class Extractor:
                 if not line.endswith("\n"):
                     line += "\n"  # this is the last or only line in the file
 
-                self.out.write_entry(f"\tline {display_line_num}: ")
                 if display_line_num != lines_count:  # add full snippets
-                    self.out.write_entry(indent(dedent("\n" + line), "\t\t"))
+                    line = indent(dedent("\n" + line), "\t\t")
                 else:
-                    self.out.write_entry(dedent(line))
+                    line = dedent(line)
+                self.out.write_entry(display_line_num, line)
 
     @staticmethod
     def get_snippet_count(line: str, start: int) -> int:
@@ -149,9 +149,7 @@ class Extractor:
         return path.name
 
     def process_dir(self, path: Path, depth: int) -> None:
-        if path.name in self.exclude or path.name.startswith(
-            (".", "_")
-        ):  # check for globs
+        if path.name in self.exclude or path.name.startswith((".", "_")):  # check for globs
             return
 
         if depth > self.max_depth:
@@ -164,9 +162,8 @@ class Extractor:
             elif self.recursive and entry.is_dir():
                 dirs.append(entry)
 
-        if dirs:
-            for dir_ in dirs:
-                self.process_dir(dir_, depth + 1)
+        for dir_ in dirs:
+            self.process_dir(dir_, depth + 1)
 
 
 def main() -> None:

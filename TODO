@@ -24,11 +24,6 @@ plan.txt
 ======================
 tdx.py
 	line 11: DEFAULT_OUT = "TODO"
-	line 91: if path in self.exclude or path.name.startswith("TODO"):  # check for globs
-	line 174: # add types for args, fix help msgs
-	line 188: help="list of tokens to search for (besides the default TODO, FIXME) e.g. WARN, REVISIT",
-======================
-text/algo.txt
-	line 27: //if line not contains "TODO", "FIXME" or --tokens:
-	line 28: if idx := line.index_of("TODO") == -1
-	line 52: start = idx + len("TODO")
+	line 92: if path in self.exclude or path.name.startswith("TODO"):  # check for globs
+	line 173: # add types for args, fix help msgs
+	line 187: help="list of tokens to search for (besides the default TODO, FIXME) e.g. WARN, REVISIT",
