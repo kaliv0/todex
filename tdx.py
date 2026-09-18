@@ -9,6 +9,7 @@ from typing import TextIO
 
 DEFAULT_MAX_DEPTH = float("inf")
 DEFAULT_OUT = "TODO"
+DEFAULT_TOKENS = ["TODO", "FIXME"]
 
 
 class Writer:
@@ -51,7 +52,7 @@ class Extractor:
     ) -> None:
         self.path = path
         self.exclude = exclude or []
-        self.tokens = tokens or []
+        self.pattern = re.compile(self.prepare_token_pattern(tokens or []), re.IGNORECASE)
         self.full_path = full_path
         self.short = short
         self.recursive = recursive
@@ -59,9 +60,14 @@ class Extractor:
         self.out = self.prepare_out(out)
 
     @staticmethod
+    def prepare_token_pattern(extra: list[str]) -> str:
+        tokens = sorted({*DEFAULT_TOKENS, *extra}, key=len, reverse=True)
+        return rf"(?<!\w)(?:{'|'.join(re.escape(tok) for tok in tokens)})(?!\w)"
+
+    @staticmethod
     def prepare_out(name: str) -> Writer:
         path = Path(name)
-        if not path.exists:
+        if not path.exists():
             raise FileNotFoundError("path not found")
 
         if path.is_dir():
@@ -70,7 +76,7 @@ class Extractor:
 
     def run(self) -> None:
         path = Path(self.path)
-        if not path.exists:
+        if not path.exists():
             raise FileNotFoundError(f"{path} not found")
 
         try:
@@ -98,9 +104,7 @@ class Extractor:
             while line := f.readline():
                 lines_count += 1
 
-                # pattern = "|".join(re.escape(tok) for tok in self.tokens # do we need to escape specail chars in tok
-                pattern = rf"\b(?:{'|'.join(self.tokens)})\b"
-                if not (match := re.search(pattern, line, re.IGNORECASE)):
+                if not (match := self.pattern.search(line)):
                     continue
                 token = match.group()
                 idx = match.start()
@@ -116,7 +120,9 @@ class Extractor:
 
                 display_line_num = lines_count
                 for _ in range(1, self.get_snippet_count(line, start=idx + len(token))):
-                    line += f.readline()
+                    if not (next_line := f.readline()):
+                        break
+                    line += next_line
                     lines_count += 1
 
                 if not line.endswith("\n"):
@@ -130,7 +136,7 @@ class Extractor:
 
     @staticmethod
     def get_snippet_count(line: str, start: int) -> int:
-        if line[start] != "{":
+        if not line.startswith("{", start):
             return 1
 
         # advance pointer to actual count
@@ -168,7 +174,7 @@ class Extractor:
 
 def main() -> None:
     parser = ArgumentParser()
-    # add types for args, fix help msgs
+    # add types for args, fix help msgs - show default values to user
     parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
     parser.add_argument(
         "-x",
