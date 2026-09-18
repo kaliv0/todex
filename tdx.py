@@ -44,6 +44,7 @@ class Extractor:
         path,
         exclude: list[str] | None = None,
         tokens: list[str] | None = None,
+        ignore_default: bool = False,
         full_path: bool = False,
         short: bool = False,
         recursive: bool = False,
@@ -52,7 +53,9 @@ class Extractor:
     ) -> None:
         self.path = path
         self.exclude = exclude or []
-        self.pattern = re.compile(self.prepare_token_pattern(tokens or []), re.IGNORECASE)
+        self.pattern = re.compile(
+            self.prepare_token_pattern(tokens or [], ignore_default), re.IGNORECASE
+        )
         self.full_path = full_path
         self.short = short
         self.recursive = recursive
@@ -60,8 +63,10 @@ class Extractor:
         self.out = self.prepare_out(out)
 
     @staticmethod
-    def prepare_token_pattern(extra: list[str]) -> str:
-        tokens = sorted({*DEFAULT_TOKENS, *extra}, key=len, reverse=True)
+    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> str:
+        if not (ignore_default and tokens):
+            tokens = [*DEFAULT_TOKENS, *tokens]
+        tokens = sorted(set(tokens), key=len, reverse=True)
         return rf"(?<!\w)(?:{'|'.join(re.escape(tok) for tok in tokens)})(?!\w)"
 
     @staticmethod
@@ -173,7 +178,9 @@ class Extractor:
 
 
 def main() -> None:
-    parser = ArgumentParser()
+    parser = ArgumentParser(
+        description="Simple TODO extractor"
+    )  # , formatter_class=ArgumentDefaultsHelpFormatter)
     # add types for args, fix help msgs - show default values to user
     parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
     parser.add_argument(
@@ -188,10 +195,16 @@ def main() -> None:
         "--tokens",
         nargs="*",
         default=[],
-        help="list of tokens to search for (besides the default TODO, FIXME) e.g. WARN, REVISIT",
+        help="list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT",
     )
     parser.add_argument(
-        "-f", "--full_path", action="store_true", help="display absolute dir/file path"
+        "-i",
+        "--ignore-default",
+        action="store_true",
+        help="use only -t tokens (skip default TODO, FIXME)",
+    )
+    parser.add_argument(
+        "-f", "--full-path", action="store_true", help="display absolute dir/file path"
     )
     parser.add_argument(
         "-s",
@@ -207,7 +220,8 @@ def main() -> None:
     )
     parser.add_argument(
         "-d",
-        "--max_depth",
+        "--max-depth",
+        metavar="N",
         default=DEFAULT_MAX_DEPTH,
         help="maximum depth of dir traversal - used with --recursive flag",
     )
