@@ -2,14 +2,37 @@
 
 
 import re
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from fnmatch import fnmatch
 from pathlib import Path
+from re import Pattern
 from textwrap import dedent, indent
 from typing import TextIO
+
+__version__ = "1.0.0"
 
 DEFAULT_MAX_DEPTH = float("inf")
 DEFAULT_OUT = "TODO"
 DEFAULT_TOKENS = ["TODO", "FIXME"]
+
+TRASH = r"""
+       ________________   ___/-\___     ___/-\___     ___/-\___
+     / /             ||  |---------|   |---------|   |---------|
+    / /              ||   |       |     | | | | |     |   |   |
+   / /             __||   |       |     | | | | |     | | | | |
+  / /   \\        I  ||   |       |     | | | | |     | | | | |
+ (-------------------||   | | | | |     | | | | |     | | | | |
+ ||               == ||   |_______|     |_______|     |_______|
+ ||       TODEX      | =============================================
+ ||          ____    |                                ____      |
+( | o      / ____ \                                 / ____ \    |)
+ ||      / / . . \ \                              / / . . \ \   |
+[ |_____| | .   . | |____________________________| | .   . | |__]
+          | .   . |                                | .   . |
+           \_____/                                  \_____/
+
+            Peak trash sniffer and TODO extractor
+"""
 
 
 class Writer:
@@ -43,6 +66,7 @@ class Extractor:
         self,
         path,
         exclude: list[str] | None = None,
+        glob: bool = False,
         tokens: list[str] | None = None,
         ignore_default: bool = False,
         full_path: bool = False,
@@ -51,46 +75,47 @@ class Extractor:
         max_depth: float = DEFAULT_MAX_DEPTH,
         out: str = DEFAULT_OUT,
     ) -> None:
-        self.path = path
-        self.exclude = exclude or []
-        self.pattern = re.compile(
-            self.prepare_token_pattern(tokens or [], ignore_default), re.IGNORECASE
-        )
+        self.root = Path(path)
+
+        self.exclude = set(exclude or [])
+        self.use_glob = glob
+
+        self.token_pattern = self.prepare_token_pattern(tokens or [], ignore_default)
+
         self.full_path = full_path
         self.short = short
         self.recursive = recursive
         self.max_depth = max_depth
+
         self.out = self.prepare_out(out)
+        self.out_path = self.out.path.absolute()
 
     @staticmethod
-    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> str:
+    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
         if not (ignore_default and tokens):
             tokens = [*DEFAULT_TOKENS, *tokens]
         tokens = sorted(set(tokens), key=len, reverse=True)
-        return rf"(?<!\w)(?:{'|'.join(re.escape(tok) for tok in tokens)})(?!\w)"
+        return re.compile(
+            rf"(?<!\w)(?:{'|'.join(re.escape(tok) for tok in tokens)})(?!\w)", re.IGNORECASE
+        )
 
     @staticmethod
     def prepare_out(name: str) -> Writer:
-        path = Path(name)
-        if not path.exists():
-            raise FileNotFoundError("path not found")
-
-        if path.is_dir():
+        if (path := Path(name)).is_dir():
             raise TypeError("out path must file not dir")
         return Writer(path)
 
     def run(self) -> None:
-        path = Path(self.path)
-        if not path.exists():
-            raise FileNotFoundError(f"{path} not found")
+        if not self.root.exists():
+            raise FileNotFoundError(f"{self.root} not found")
 
         try:
-            if path.is_file():
-                self.process_file(path)
-            elif path.is_dir():
-                self.process_dir(path, depth=0)
+            if self.root.is_file():
+                self.process_file(self.root)
+            elif self.root.is_dir():
+                self.process_dir(self.root, depth=0)
             else:
-                print(f"{path} must be path to file or dir")
+                print(f"{self.root} must be path to file or dir")
         # OSError might be raised from path.iterdir, also catches FileNotFoundError
         except (OSError, ValueError, TypeError, RuntimeError) as e:  # revisit
             print(e)
@@ -100,7 +125,7 @@ class Extractor:
             self.out.close()
 
     def process_file(self, path: Path) -> None:
-        if path in self.exclude or path.name.startswith("TODO"):  # check for globs
+        if self.is_excluded(path):
             return
 
         with path.open() as f:
@@ -109,7 +134,7 @@ class Extractor:
             while line := f.readline():
                 lines_count += 1
 
-                if not (match := self.pattern.search(line)):
+                if not (match := self.token_pattern.search(line)):
                     continue
                 token = match.group()
                 idx = match.start()
@@ -146,7 +171,6 @@ class Extractor:
 
         # advance pointer to actual count
         start = start + 1
-
         if (end := line[start:].find("}")) == -1:
             raise ValueError("invalid snippet count")
         # cut snippet line count and try parse to int -> if it fails global error handler will log the error
@@ -160,7 +184,7 @@ class Extractor:
         return path.name
 
     def process_dir(self, path: Path, depth: int) -> None:
-        if path.name in self.exclude or path.name.startswith((".", "_")):  # check for globs
+        if self.is_excluded(path):
             return
 
         if depth > self.max_depth:
@@ -176,19 +200,46 @@ class Extractor:
         for dir_ in dirs:
             self.process_dir(dir_, depth + 1)
 
+    def is_excluded(self, path: Path) -> bool:
+        # skip summary file
+        if path.absolute() == self.out_path:
+            return True
+
+        # always process scan root
+        if path == self.root:
+            return False
+
+        rel_path = path.relative_to(self.root).as_posix()
+        name = path.name
+        if self.use_glob:
+            return any(fnmatch(rel_path, entry) or fnmatch(name, entry) for entry in self.exclude)
+        # exact path under root or name anywhere in nested dirs under root
+        return rel_path in self.exclude or name in self.exclude
+
+
+class NoUsageFormatter(RawDescriptionHelpFormatter):
+    def _format_usage(self, usage, actions, groups, prefix):
+        return ""
 
 def main() -> None:
     parser = ArgumentParser(
-        description="Simple TODO extractor"
-    )  # , formatter_class=ArgumentDefaultsHelpFormatter)
-    # add types for args, fix help msgs - show default values to user
+        prog="todex",
+        formatter_class=NoUsageFormatter,
+        description=TRASH,
+    )
     parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
     parser.add_argument(
         "-x",
         "--exclude",
         nargs="*",
         default=[],
-        help="list of dirs/files to exclude - also works with glob patterns",
+        help="list of dirs/files to exclude - accepts glob pattern combined with -g/--glob flag",
+    )
+    parser.add_argument(
+        "-g",
+        "--glob",
+        action="store_true",
+        help="exclude entries matching -x glob patterns",
     )
     parser.add_argument(
         "-t",
@@ -221,12 +272,13 @@ def main() -> None:
     parser.add_argument(
         "-d",
         "--max-depth",
+        type=int,
         metavar="N",
         default=DEFAULT_MAX_DEPTH,
         help="maximum depth of dir traversal - used with --recursive flag",
     )
     parser.add_argument("-o", "--out", default=DEFAULT_OUT, help="path to output file")
-
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
     Extractor(**vars(args)).run()
 
