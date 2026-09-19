@@ -55,14 +55,13 @@ class Extractor:
             # prevented by CLI (-i without -t) but you can never be too carefull
             raise ValueError("no tokens to search for")
         tokens = sorted(dict.fromkeys(tokens), key=len, reverse=True)
-        return re.compile(
-            rf"(?<!\w)(?:{'|'.join(re.escape(tok) for tok in tokens)})(?!\w)", re.IGNORECASE
-        )
+        alternations = "|".join(re.escape(tok) for tok in tokens)
+        return re.compile(rf"(?<!\w)(?:{alternations})(?!\w)", re.IGNORECASE)
 
     @staticmethod
     def prepare_out(name: str) -> Writer:
         if (path := Path(name)).is_dir():
-            raise TypeError("out path must be file not dir")
+            path = path / DEFAULT_OUT
         return Writer(path)
 
     @cached_property

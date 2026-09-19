@@ -121,7 +121,12 @@ the extractor will include multiline snippet with the length specified between t
         action="store_true",
         help="enable debug mode",
     )
-    parser.add_argument("-o", "--out", default=DEFAULT_OUT, help="path to output file")
+    parser.add_argument(
+        "-o",
+        "--out",
+        default=DEFAULT_OUT,
+        help="path to output file, if existing dir is passed instead - TODO out file will be saved inside",
+    )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
 
