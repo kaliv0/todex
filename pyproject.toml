@@ -1,7 +1,7 @@
 [project]
 name = "todex"
-version = "1.0.0"
-description = "TODO extractor"
+version = "1.0.1"
+description = "CLI TODO extractor"
 keywords = ["TODO extractor", "cli tool"]
 authors = [
   {name = "kaliv0", email = "kaliv.zero@gmail.com"},
