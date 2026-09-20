@@ -55,11 +55,7 @@ class Extractor:
         return PathSpec.from_lines("gitignore", exclude)
 
     def get_gitignore_patterns(self) -> list[str]:
-        if self.root.is_file():
-            root = self.root.parent
-        else:
-            root = self.root
-
+        root = self.root.parent if self.root.is_file() else self.root
         if (gitignore_file := root / ".gitignore").is_file():
             return gitignore_file.read_text(encoding="utf-8").splitlines()
         return []

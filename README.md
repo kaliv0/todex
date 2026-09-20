@@ -26,7 +26,7 @@ todex <PATH> [OPTIONS...]
 | `-x`, `--exclude [PATTERN ...]` | git-like patterns to skip (paths, names, or globs together with default .* / __* ), e.g.<br><br><table><tr><td>bar.py</td><td>any file named bar.py</td></tr><tr><td>/bar.py</td><td>only top-level</td></tr><tr><td>foo/bar.py</td><td>path under the scan root</td></tr><tr><td>vendor/</td><td>directory and its contents</td></tr><tr><td>**/*.pyc</td><td>nested matches</td></tr><tr><td>!fizz.md</td><td>re-include after a broader exclude</td></tr></table> |
 | `-H`, `--include-hidden` | do not apply default excludes for hidden names (.* / __*) |
 | `-g`, `--use-gitignore` | read patterns to exclude from .gitignore file (if present in the scan root) |
-| `-t`, `--tokens [TOKEN ...]` | list of tokens to search for (together with default TODO, FIXME)<br>e.g. WARN, REVISIT.<br>If the token is followed by {lines-count} e.g. #FIXME{3}<br>the extractor will include multiline snippet with the length specified between the curly braces:<br><br>#FIXME{3} - revist after release<br>if self.foo == "bar":<br>&nbsp;&nbsp;&nbsp;&nbsp;return f"fizz{buzz}" |
+| `-t`, `--tokens [TOKEN ...]` | list of tokens to search for (together with default TODO, FIXME)<br>e.g. WARN, REVISIT.<br>If the token is followed by {lines-count} e.g. #FIXME{3}<br>the extractor will include multiline snippet with the length specified between the curly braces:<br><br>#FIXME{3} - revist after release<br>if self.foo == "bar":<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return f"fizz{buzz}" |
 | `-i`, `--ignore-default` | use only -t tokens (skip default TODO, FIXME) |
 | `-f`, `--full-path` | display absolute dir/file path |
 | `-s`, `--short` | display only token messages e.g. '#FIXME{3} - revist after release' - ignore longer snippets |
