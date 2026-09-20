@@ -18,8 +18,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy>=2.3.1",
+    "pytest>=8.0.0",
     "ruff>=0.16.8",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+tmp_path_retention_policy = "none"
 
 [project.scripts]
 todex = "todex.__main__:main"
@@ -32,3 +37,4 @@ requires = ["pdm-backend"]
 [tool.ruff]
 fix = true
 line-length = 100
+exclude = ["tests/testdata"]

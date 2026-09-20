@@ -48,6 +48,28 @@ def main() -> None:
     )
     parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
     parser.add_argument(
+        "-t",
+        "--tokens",
+        nargs="*",
+        default=[],
+        metavar="TOKEN",
+        help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
+If the token is followed by {lines-count} e.g. #FIXME{3}
+the extractor will include multiline snippet with the length specified between the curly braces:
+
+    #FIXME{3} - revist after release
+    if self.foo == "bar":
+        return f"fizz{buzz}"
+
+""",
+    )
+    parser.add_argument(
+        "-i",
+        "--ignore-default",
+        action="store_true",
+        help="use only -t tokens (skip default TODO, FIXME)",
+    )
+    parser.add_argument(
         "-x",
         "--exclude",
         nargs="*",
@@ -71,26 +93,10 @@ def main() -> None:
         help="do not apply default excludes for hidden names (.* / __*)",
     )
     parser.add_argument(
-        "-t",
-        "--tokens",
-        nargs="*",
-        default=[],
-        metavar="TOKEN",
-        help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
-If the token is followed by {lines-count} e.g. #FIXME{3}
-the extractor will include multiline snippet with the length specified between the curly braces:
-
-    #FIXME{3} - revist after release
-    if self.foo == "bar":
-        return f"fizz{buzz}"
-
-""",
-    )
-    parser.add_argument(
-        "-i",
-        "--ignore-default",
+        "-g",
+        "--use-gitignore",
         action="store_true",
-        help="use only -t tokens (skip default TODO, FIXME)",
+        help="read patterns to exclude from .gitignore file (if present in the scan root)",
     )
     parser.add_argument(
         "-f", "--full-path", action="store_true", help="display absolute dir/file path"
