@@ -44,7 +44,7 @@ class Extractor:
     def prepare_exclude_spec(
         self, exclude: list[str], include_hidden: bool, use_gitignore: bool
     ) -> PathSpec:
-        if use_gitignore:
+        if use_gitignore and self.root.is_dir():
             exclude = [*self.get_gitignore_patterns(), *exclude]
 
         if not include_hidden:
@@ -55,8 +55,7 @@ class Extractor:
         return PathSpec.from_lines("gitignore", exclude)
 
     def get_gitignore_patterns(self) -> list[str]:
-        root = self.root.parent if self.root.is_file() else self.root
-        if (gitignore_file := root / ".gitignore").is_file():
+        if (gitignore_file := self.root / ".gitignore").is_file():
             return gitignore_file.read_text(encoding="utf-8").splitlines()
         return []
 

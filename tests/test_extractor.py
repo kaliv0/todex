@@ -89,14 +89,14 @@ def test_g_missing_gitignore_is_noop(sample, run):
     assert "TODO: bare" in text
 
 
-def test_file_path_g_loads_parent_gitignore_and_processes(sample, out, run):
+def test_file_path_g_is_noop_but_still_processes(sample, out, run):
+    # -g only loads .gitignore for directory scans -> explicit file PATH is always processed
     patterns = Extractor(
         path=sample / "app.py",
         use_gitignore=True,
         out=str(out),
     ).get_gitignore_patterns()
-    assert "vendor/" in patterns
-    assert "skip_me.py" in patterns
+    assert patterns == []
 
     text = run(sample / "app.py", out, use_gitignore=True)
     assert "TODO: main" in text

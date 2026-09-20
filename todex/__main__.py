@@ -94,7 +94,7 @@ the extractor will include multiline snippet with the length specified between t
         "-g",
         "--use-gitignore",
         action="store_true",
-        help="read patterns to exclude from .gitignore file (if present in the scan root)",
+        help="use exclude patterns from .gitignore (if present in scan root) when traversing dirs",
     )
     parser.add_argument(
         "-f", "--full-path", action="store_true", help="display absolute dir/file path"
