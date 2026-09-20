@@ -75,7 +75,6 @@ the extractor will include multiline snippet with the length specified between t
         default=[],
         metavar="PATTERN",
         help="""git-like patterns to skip (paths, names, or globs together with default .* / __*), e.g.
-
     bar.py       any file named bar.py
     /bar.py      only top-level
     foo/bar.py   path under the scan root
@@ -132,7 +131,7 @@ the extractor will include multiline snippet with the length specified between t
         default=DEFAULT_OUT,
         help="path to output file, if existing dir is passed instead - TODO out file will be saved inside",
     )
-    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
     validator = ArgValidator(parser, args)
