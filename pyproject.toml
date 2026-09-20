@@ -1,6 +1,6 @@
 [project]
 name = "todex"
-version = "1.0.1"
+version = "1.1.0"
 description = "CLI TODO extractor"
 keywords = ["TODO extractor", "cli tool"]
 authors = [
@@ -23,6 +23,7 @@ dev = [
 
 [project.scripts]
 todex = "todex.__main__:main"
+tdx = "todex.__main__:main"
 
 [build-system]
 build-backend = "pdm.backend"

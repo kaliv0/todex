@@ -42,7 +42,7 @@ class ArgValidator:
 
 def main() -> None:
     parser = ArgumentParser(
-        prog="todex",
+        prog=sys.argv[0],
         formatter_class=NoUsageFormatter,
         description=TRASH,
     )
@@ -128,10 +128,11 @@ the extractor will include multiline snippet with the length specified between t
         help="path to output file, if existing dir is passed instead - TODO out file will be saved inside",
     )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     validator = ArgValidator(parser, args)
     validator.require("ignore_default", "tokens", "-i/--ignore-default", "-t/--tokens")
+
     try:
         Extractor(**vars(args)).run()
     except KeyboardInterrupt:
