@@ -142,7 +142,8 @@ class Extractor:
                         line = dedent(line)
                     self.out.write_entry(display_line_num, line)
         except UnicodeDecodeError as e:
-            print(f"skipping {self.prepare_path_name(path)}:\n{e}", file=sys.stderr)
+            if self.debug:
+                print(f"skipping {self.prepare_path_name(path)}:\n{e}", file=sys.stderr)
 
     @staticmethod
     def get_snippet_count(line: str, start: int) -> int:

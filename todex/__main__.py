@@ -75,6 +75,7 @@ the extractor will include multiline snippet with the length specified between t
         default=[],
         metavar="PATTERN",
         help="""git-like patterns to skip (paths, names, or globs together with default .* / __*), e.g.
+
     bar.py       any file named bar.py
     /bar.py      only top-level
     foo/bar.py   path under the scan root
