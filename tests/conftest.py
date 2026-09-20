@@ -10,13 +10,22 @@ TESTDATA = Path(__file__).parent / "testdata"
 
 @pytest.fixture
 def sample(tmp_path: Path) -> Path:
-    """Copy the sample project tree into an isolated temp dir."""
+    # copy the sample project tree into an isolated temp dir."""
     dest = tmp_path / "project"
     shutil.copytree(TESTDATA, dest)
-    # root .gitignore ignores .venv/ -> create it here so clones still get the fixture
+
+    # NB: paths matching ignore rules never land in git — materialize them for the scan.
+    # testdata/.gitignore: vendor/, skip_me.py vs repo .gitignore: .venv/
+    (dest / "skip_me.py").write_text("# TODO: skip\n", encoding="utf-8")
+
+    vendor = dest / "vendor"
+    vendor.mkdir(exist_ok=True)
+    (vendor / "lib.py").write_text("# TODO: vendored\n", encoding="utf-8")
+
     venv = dest / ".venv"
     venv.mkdir(exist_ok=True)
     (venv / "x.py").write_text("# TODO: venv\n", encoding="utf-8")
+
     return dest
 
 

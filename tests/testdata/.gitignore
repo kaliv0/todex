@@ -1,4 +1,5 @@
 # comment
+# vendor/ and skip_me.py fixtures are created in conftest (git ignores them here)
 
 vendor/
 skip_me.py

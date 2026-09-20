@@ -69,7 +69,7 @@ def test_g_with_H_includes_hidden_but_keeps_gitignore(sample, out, run):
     text = run(sample, out, use_gitignore=True, include_hidden=True, recursive=True)
     assert "TODO: hidden" in text
     assert "TODO: vendored" not in text
-    assert "TODO: venv" in text  # .venv not in .gitignore; .* default off via -H
+    assert "TODO: venv" in text  # .venv not in .gitignore, .* default off via -H
 
 
 def test_g_with_x_bang_reincludes_vendor(sample, out, run):
@@ -122,8 +122,6 @@ def test_without_r_skips_nested(sample, out, run):
 
 
 # --- short / snippets ---
-
-
 def test_s_omits_snippet_body(sample, out, run):
     text = run(sample / "snippet.py", out, short=True)
     assert "FIXME" in text
