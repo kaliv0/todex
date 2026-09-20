@@ -19,10 +19,11 @@ class Extractor:
     def __init__(
         self,
         path,
-        exclude: list[str] | None = None,
-        include_hidden: bool = False,
         tokens: list[str] | None = None,
         ignore_default: bool = False,
+        exclude: list[str] | None = None,
+        include_hidden: bool = False,
+        use_gitignore: bool = False,
         out: str = DEFAULT_OUT,
         full_path: bool = False,
         short: bool = False,
@@ -31,8 +32,8 @@ class Extractor:
         debug: bool = False,
     ) -> None:
         self.root = Path(path)
-        self.exclude_spec = self.prepare_exclude_spec(exclude or [], include_hidden)
         self.token_pattern = self.prepare_token_pattern(tokens or [], ignore_default)
+        self.exclude_spec = self.prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
         self.out = self.prepare_out(out)
         self.full_path = full_path
         self.short = short
@@ -40,20 +41,34 @@ class Extractor:
         self.max_depth = max_depth
         self.debug = __debug__ and debug
 
-    @staticmethod
-    def prepare_exclude_spec(exclude: list[str], include_hidden: bool) -> PathSpec:
+    def prepare_exclude_spec(
+        self, exclude: list[str], include_hidden: bool, use_gitignore: bool
+    ) -> PathSpec:
+        if use_gitignore:
+            exclude = [*self.get_gitignore_patterns(), *exclude]
+
         if not include_hidden:
             exclude = [*DEFAULT_GLOBS, *exclude]
+
         exclude = list(dict.fromkeys(exclude))  # dedupe + keep order
+        # NB: ignores blank/# lines from .gitignore file
         return PathSpec.from_lines("gitignore", exclude)
+
+    def get_gitignore_patterns(self) -> list[str]:
+        root = self.root.parent if self.root.is_file() else self.root
+        if (gitignore_file := root / ".gitignore").is_file():
+            return gitignore_file.read_text(encoding="utf-8").splitlines()
+        return []
 
     @staticmethod
     def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
         if not ignore_default:
             tokens = [*DEFAULT_TOKENS, *tokens]
+
         if not tokens:
             # prevented by CLI (-i without -t) but you can never be too carefull
             raise ValueError("no tokens to search for")
+
         tokens = sorted(dict.fromkeys(tokens), key=len, reverse=True)
         alternations = "|".join(re.escape(tok) for tok in tokens)
         return re.compile(rf"(?<!\w)(?:{alternations})(?!\w)", re.IGNORECASE)

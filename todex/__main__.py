@@ -1,9 +1,8 @@
 import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
+from todex import __version__
 from todex.extractor import DEFAULT_MAX_DEPTH, DEFAULT_OUT, Extractor
-
-__version__ = "1.0.0"
 
 TRASH = r"""
        ________________   ___/-\___     ___/-\___     ___/-\___
@@ -42,11 +41,33 @@ class ArgValidator:
 
 def main() -> None:
     parser = ArgumentParser(
-        prog="todex",
+        prog=sys.argv[0],
         formatter_class=NoUsageFormatter,
         description=TRASH,
     )
     parser.add_argument("path", metavar="PATH", help="path to file or dir to process")
+    parser.add_argument(
+        "-t",
+        "--tokens",
+        nargs="*",
+        default=[],
+        metavar="TOKEN",
+        help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
+If the token is followed by {lines-count} e.g. #FIXME{3}
+the extractor will include multiline snippet with the length specified between the curly braces:
+
+    #FIXME{3} - revist after release
+    if self.foo == "bar":
+        return f"fizz{buzz}"
+
+""",
+    )
+    parser.add_argument(
+        "-i",
+        "--ignore-default",
+        action="store_true",
+        help="use only -t tokens (skip default TODO, FIXME)",
+    )
     parser.add_argument(
         "-x",
         "--exclude",
@@ -71,26 +92,10 @@ def main() -> None:
         help="do not apply default excludes for hidden names (.* / __*)",
     )
     parser.add_argument(
-        "-t",
-        "--tokens",
-        nargs="*",
-        default=[],
-        metavar="TOKEN",
-        help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
-If the token is followed by {lines-count} e.g. #FIXME{3}
-the extractor will include multiline snippet with the length specified between the curly braces:
-
-    #FIXME{3} - revist after release
-    if self.foo == "bar":
-        return f"fizz{buzz}"
-
-""",
-    )
-    parser.add_argument(
-        "-i",
-        "--ignore-default",
+        "-g",
+        "--use-gitignore",
         action="store_true",
-        help="use only -t tokens (skip default TODO, FIXME)",
+        help="read patterns to exclude from .gitignore file (if present in the scan root)",
     )
     parser.add_argument(
         "-f", "--full-path", action="store_true", help="display absolute dir/file path"
@@ -128,10 +133,11 @@ the extractor will include multiline snippet with the length specified between t
         help="path to output file, if existing dir is passed instead - TODO out file will be saved inside",
     )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     validator = ArgValidator(parser, args)
     validator.require("ignore_default", "tokens", "-i/--ignore-default", "-t/--tokens")
+
     try:
         Extractor(**vars(args)).run()
     except KeyboardInterrupt:
