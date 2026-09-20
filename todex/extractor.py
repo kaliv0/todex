@@ -165,10 +165,7 @@ class Extractor:
         return path.name
 
     def process_dir(self, path: Path, depth: int) -> None:
-        if self.is_excluded(path, is_dir=True):
-            return
-
-        if depth > self.max_depth:
+        if self.is_excluded(path, is_dir=True) or depth > self.max_depth:
             return
 
         dirs = []
