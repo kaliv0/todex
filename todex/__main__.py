@@ -1,9 +1,8 @@
 import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
+from todex import __version__
 from todex.extractor import DEFAULT_MAX_DEPTH, DEFAULT_OUT, Extractor
-
-__version__ = "1.0.0"
 
 TRASH = r"""
        ________________   ___/-\___     ___/-\___     ___/-\___
