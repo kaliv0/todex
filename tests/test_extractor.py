@@ -226,7 +226,7 @@ def test_does_not_rescan_output_file(sample):
 def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
     (tmp_path / "good.py").write_text("# TODO: keep me\n", encoding="utf-8")
     (tmp_path / "bad.bin").write_bytes(b"\xff\xfe TODO: binary\n")
-    text = run(tmp_path, tmp_path / "out.txt")
+    text = run(tmp_path, tmp_path / "out.txt", debug=True)
     assert "TODO: keep me" in text
     err = capsys.readouterr().err
     assert "skipping" in err
