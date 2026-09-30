@@ -24,7 +24,7 @@ def test_i_with_t_uses_only_custom_tokens(sample, out, run):
 
 
 def test_custom_tokens_smoke(sample, out, run):
-    """End-to-end: exotic token strings match through file scan."""
+    # end-to-end: exotic token strings match through file scan
     text = run(
         sample / "custom_tokens.py",
         out,
@@ -211,7 +211,7 @@ def test_o_dir_writes_todo_inside(sample):
 
 
 def test_does_not_rescan_output_file(sample):
-    """Output path must be skipped so a prior TODO file is not re-ingested."""
+    # NB: Output path must be skipped so a prior TODO file is not re-ingested
     out = sample / "TODO"
     out.write_text(
         "======================\nstale.py\n\tline 1: # TODO: from previous run\n",

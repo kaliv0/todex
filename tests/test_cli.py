@@ -25,7 +25,7 @@ def test_missing_path_exits_nonzero(monkeypatch, tmp_path):
 
 
 def test_argv_reaches_extractor(monkeypatch, sample):
-    """Smoke: CLI flags are wired through to Extractor."""
+    # NB: CLI flags are wired through to Extractor
     out = sample / "cli_out.txt"
     run_main(monkeypatch, [str(sample / "app.py"), "-o", str(out), "-t", "WARN", "-i"])
     text = out.read_text(encoding="utf-8")

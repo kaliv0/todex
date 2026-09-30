@@ -7,6 +7,7 @@ help:
 	@echo "  typecheck    uv run mypy ."
 	@echo "  test         uv run pytest"
 	@echo "  build        uv build"
+	@echo "  publish      uvx uv-publish"
 	@echo "  clean        remove ruff/mypy/pytest caches"
 	@echo "  all          sync format typecheck test"
 
