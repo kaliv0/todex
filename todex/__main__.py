@@ -49,14 +49,13 @@ def main() -> None:
     parser.add_argument(
         "-t",
         "--tokens",
-        nargs="*",
-        default=[],
+        nargs="+",
         metavar="TOKEN",
         help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
 If the token is followed by {lines-count} e.g. #FIXME{3}
 the extractor will include multiline snippet with the length specified between the curly braces:
 
-    #FIXME{3} - revist after release
+    #FIXME{3} - revisit after release
     if self.foo == "bar":
         return f"fizz{buzz}"
 
@@ -71,8 +70,7 @@ the extractor will include multiline snippet with the length specified between t
     parser.add_argument(
         "-x",
         "--exclude",
-        nargs="*",
-        default=[],
+        nargs="+",
         metavar="PATTERN",
         help="""git-like patterns to skip (paths, names, or globs together with default .* / __*), e.g.
 
@@ -104,7 +102,7 @@ the extractor will include multiline snippet with the length specified between t
         "-s",
         "--short",
         action="store_true",
-        help="display only token messages e.g. '#TODO:  after release', ignore longer snippets",
+        help="display only token messages e.g. '#TODO: after release', ignore longer snippets",
     )
     parser.add_argument(
         "-r",

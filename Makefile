@@ -2,13 +2,13 @@
 
 help:
 	@echo "Targets:"
-	@echo "  sync         uv sync --all-extras --dev"
-	@echo "  format       uv run ruff check && uv run ruff format"
-	@echo "  typecheck    uv run mypy ."
-	@echo "  test         uv run pytest"
-	@echo "  build        uv build"
-	@echo "  publish      uvx uv-publish"
-	@echo "  clean        remove ruff/mypy/pytest caches"
+	@echo "  sync         sync all dependencies"
+	@echo "  format       run ruff"
+	@echo "  typecheck    run mypy"
+	@echo "  test         run pytest"
+	@echo "  build        build project"
+	@echo "  publish      publish to PyPi"
+	@echo "  clean        remove caches & dist"
 	@echo "  all          sync format typecheck test"
 
 sync:
@@ -30,6 +30,6 @@ publish: build
 	uvx uv-publish
 
 clean:
-	rm -rf .ruff_cache/ .mypy_cache/ .pytest_cache/
+	rm -rf .ruff_cache/ .mypy_cache/ .pytest_cache/ dist/
 
 all: sync format typecheck test

@@ -65,7 +65,7 @@ class Extractor:
             tokens = [*DEFAULT_TOKENS, *tokens]
 
         if not tokens:
-            # prevented by CLI (-i without -t) but you can never be too carefull
+            # prevented by CLI (-i without -t) but you can never be too careful
             raise ValueError("no tokens to search for")
 
         tokens = sorted(dict.fromkeys(tokens), key=len, reverse=True)
