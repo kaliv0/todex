@@ -1,8 +1,21 @@
 import sys
-from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+import traceback
+from argparse import (
+    Action,
+    ArgumentParser,
+    ArgumentTypeError,
+    Namespace,
+    RawTextHelpFormatter,
+    _HelpAction,
+    _MutuallyExclusiveGroup,
+    _VersionAction,
+)
+from collections.abc import Iterable
+from functools import cached_property
+from typing import ClassVar
 
 from todex import __version__
-from todex.extractor import DEFAULT_MAX_DEPTH, DEFAULT_OUT, Extractor
+from todex.extractor import DEFAULT_OUT, Extractor
 
 TRASH = r"""
        ________________   ___/-\___     ___/-\___     ___/-\___
@@ -25,18 +38,49 @@ TRASH = r"""
 
 
 class NoUsageFormatter(RawTextHelpFormatter):
-    def _format_usage(self, usage, actions, groups, prefix):
+    def _format_usage(
+        self,
+        usage: str | None,
+        actions: Iterable[Action],
+        groups: Iterable[_MutuallyExclusiveGroup],
+        prefix: str | None,
+    ) -> str:
         return ""
 
 
 class ArgValidator:
+    DEPENDENT_FLAGS: ClassVar[dict[str, str]] = {
+        "ignore_default": "tokens",
+        "max_depth": "recursive",
+    }
+
     def __init__(self, parser: ArgumentParser, args: Namespace) -> None:
         self.parser = parser
         self.args = args
 
-    def require(self, flag_attr: str, needs_attr: str, flag: str, needs: str) -> None:
-        if getattr(self.args, flag_attr) and not getattr(self.args, needs_attr):
-            self.parser.error(f"{flag} requires {needs}")
+    @cached_property
+    def attrs_to_flags(self) -> dict[str, str]:
+        return {
+            action.dest: "/".join(action.option_strings)
+            for action in self.parser._actions
+            if not isinstance(action, (_HelpAction, _VersionAction)) and action.option_strings
+        }
+
+    def validate_dependent_flags(self) -> None:
+        for flag, needs in self.DEPENDENT_FLAGS.items():
+            if getattr(self.args, flag) and not getattr(self.args, needs):
+                self.parser.error(f"{self.attrs_to_flags[flag]} flag requires {self.attrs_to_flags[needs]}")
+
+
+def require_positive_int(value: str) -> int:
+    try:
+        num = int(value)
+    except ValueError as e:
+        raise ArgumentTypeError("expected int type") from e
+
+    if num <= 0:
+        raise ArgumentTypeError("expected positive value")
+    return num
 
 
 def main() -> None:
@@ -95,9 +139,7 @@ the extractor will include multiline snippet with the length specified between t
         action="store_true",
         help="use exclude patterns from .gitignore (if present in scan root) when traversing dirs",
     )
-    parser.add_argument(
-        "-f", "--full-path", action="store_true", help="display absolute dir/file path"
-    )
+    parser.add_argument("-f", "--full-path", action="store_true", help="display absolute dir/file path")
     parser.add_argument(
         "-s",
         "--short",
@@ -113,9 +155,8 @@ the extractor will include multiline snippet with the length specified between t
     parser.add_argument(
         "-m",
         "--max-depth",
-        type=int,
+        type=require_positive_int,
         metavar="N",
-        default=DEFAULT_MAX_DEPTH,
         help="maximum depth of dir traversal - used with -r/--recursive flag",
     )
     parser.add_argument(
@@ -133,15 +174,14 @@ the extractor will include multiline snippet with the length specified between t
     parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
-    validator = ArgValidator(parser, args)
-    validator.require("ignore_default", "tokens", "-i/--ignore-default", "-t/--tokens")
+    ArgValidator(parser, args).validate_dependent_flags()
 
     try:
         Extractor(**vars(args)).run()
     except KeyboardInterrupt:
         sys.exit(130)
     except (OSError, TypeError, ValueError) as e:
-        print(e, file=sys.stderr)
+        traceback.print_exception(e, limit=0, file=sys.stderr)
         sys.exit(1)
 
 

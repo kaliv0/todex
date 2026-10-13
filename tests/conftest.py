@@ -10,7 +10,7 @@ TESTDATA = Path(__file__).parent / "testdata"
 
 @pytest.fixture
 def sample(tmp_path: Path) -> Path:
-    # copy the sample project tree into an isolated temp dir."""
+    # copy the sample project tree into an isolated temp dir
     dest = tmp_path / "project"
     shutil.copytree(TESTDATA, dest)
 

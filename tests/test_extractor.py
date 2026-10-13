@@ -155,12 +155,12 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
 def test_get_snippet_count_default_one():
     line = "# TODO: x"
     start = line.index("TODO") + len("TODO")
-    assert Extractor.get_snippet_count(line, start=start) == 1
+    assert Extractor(path=".").get_snippet_count(line, start=start, line_num=1) == 1
 
 
 def test_get_snippet_count_parses_braces():
     line = "# TODO{3} x"
-    assert Extractor.get_snippet_count(line, start=line.index("{")) == 3
+    assert Extractor(path=".").get_snippet_count(line, start=line.index("{"), line_num=1) == 3
 
 
 @pytest.mark.parametrize(

@@ -9,7 +9,7 @@ from pathspec import PathSpec
 
 from todex.writer import Writer
 
-DEFAULT_MAX_DEPTH = float("inf")
+DEFAULT_MAX_DEPTH = 120
 DEFAULT_OUT = "TODO"
 DEFAULT_GLOBS = [".*", "__*"]
 DEFAULT_TOKENS = ["TODO", "FIXME"]
@@ -28,7 +28,7 @@ class Extractor:
         full_path: bool = False,
         short: bool = False,
         recursive: bool = False,
-        max_depth: float = DEFAULT_MAX_DEPTH,
+        max_depth: int | None = None,
         debug: bool = False,
     ) -> None:
         self.root = Path(path)
@@ -38,12 +38,11 @@ class Extractor:
         self.full_path = full_path
         self.short = short
         self.recursive = recursive
-        self.max_depth = max_depth
+        # the CLI sets max_depth to None if omitted so we need to set the default explicitly
+        self.max_depth = DEFAULT_MAX_DEPTH if max_depth is None else max_depth
         self.debug = __debug__ and debug
 
-    def prepare_exclude_spec(
-        self, exclude: list[str], include_hidden: bool, use_gitignore: bool
-    ) -> PathSpec:
+    def prepare_exclude_spec(self, exclude: list[str], include_hidden: bool, use_gitignore: bool) -> PathSpec:
         if use_gitignore and self.root.is_dir():
             exclude = [*self.get_gitignore_patterns(), *exclude]
 
@@ -127,7 +126,10 @@ class Extractor:
                         continue
 
                     display_line_num = lines_count
-                    for _ in range(1, self.get_snippet_count(line, start=idx + len(token))):
+                    for _ in range(
+                        1,
+                        self.get_snippet_count(line, start=idx + len(token), line_num=display_line_num),
+                    ):
                         if not (next_line := f.readline()):
                             break
                         line += next_line
@@ -145,17 +147,27 @@ class Extractor:
             if self.debug:
                 print(f"skipping {self.prepare_path_name(path)}:\n{e}", file=sys.stderr)
 
-    @staticmethod
-    def get_snippet_count(line: str, start: int) -> int:
+    def get_snippet_count(self, line: str, start: int, line_num: int) -> int:
         if not line.startswith("{", start):
             return 1
 
         # advance pointer to actual count
         start = start + 1
         if (end := line[start:].find("}")) == -1:
-            raise ValueError("invalid snippet count")
-        # cut snippet line count and try parse to int -> if it fails global error handler will log the error
-        return int(line[start : start + end])
+            err = ValueError("invalid snippet count")
+            self._add_debug_note(err, line, line_num)
+            raise err
+
+        try:
+            snippet_count = int(line[start : start + end])
+        except ValueError as err:
+            self._add_debug_note(err, line, line_num)
+            raise
+        return snippet_count
+
+    def _add_debug_note(self, err: Exception, line: str, line_num: int) -> None:
+        if self.debug:
+            err.add_note(f"\tline {line_num}: {line.strip()}")
 
     def prepare_path_name(self, path: Path) -> str:
         if self.full_path:
