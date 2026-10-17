@@ -29,9 +29,11 @@ You can also invoke `todex` using the shorter alias `tdx`.
 | `-t`, `--tokens TOKEN [TOKEN ...]` | list of tokens to search for (together with default TODO, FIXME)<br>e.g. WARN, REVISIT.<br>If the token is followed by {lines-count} e.g. #FIXME{3}<br>the extractor will include multiline snippet with the length specified between the curly braces:<br><br>#FIXME{3} - revisit after release<br>if self.foo == "bar":<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return f"fizz{buzz}" |
 | `-i`, `--ignore-default` | use only -t tokens (skip default TODO, FIXME) |
 | `-f`, `--full-path` | display absolute dir/file path |
-| `-s`, `--short` | display only token messages e.g. '#FIXME{3} - revisit after release' - ignore longer snippets |
+| `-c`, `--concise` | display only token messages e.g. '#TODO{5}: after release', ignore longer snippets |
 | `-r`, `--recursive` | traverse given dir path recursively |
 | `-m`, `--max-depth N` | maximum depth of dir traversal - used with -r/--recursive flag |
 | `-d`, `--debug` | enable debug mode |
-| `-o`, `--out OUT` | path to output file, if existing dir is passed instead - TODO out file will be saved inside |
+| `-o`, `--out OUT` | path to output file - if existing dir is passed instead TODO out file will be saved inside the path |
+| `-s`, `--stdout` | output result to stdout |
+| `--tee` | output result to stdout and save to file |
 | `-v`, `--version` | show program's version number and exit |
