@@ -11,15 +11,27 @@ def run_main(monkeypatch, argv: list[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    "concise, flag, needs",
+    "arg, name, needs",
     [("-i", "-i/--ignore-default", "-t/--tokens"), ("-m20", "-m/--max-depth", "-r/--recursive")],
 )
-def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, concise, flag, needs):
+def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, arg, name, needs):
     with pytest.raises(SystemExit) as exc:
-        run_main(monkeypatch, [concise, str(tmp_path)])
+        run_main(monkeypatch, [arg, str(tmp_path)])
     assert exc.value.code == 2
     err = capsys.readouterr().err
-    assert err == f"todex: error: {flag} flag requires {needs}\n"
+    assert err == f"todex: error: {name} flag requires {needs}\n"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["-s", "-o", "x"], ["-s", "--tee"]],
+)
+def test_stdout_mix_errors(monkeypatch, tmp_path, capsys, extra):
+    with pytest.raises(SystemExit) as exc:
+        run_main(monkeypatch, [str(tmp_path), *extra])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert err == "todex: error: shouldn't mix --stdout and --out or --tee flags\n"
 
 
 @pytest.mark.parametrize(
@@ -59,3 +71,15 @@ def test_r_m_limits_depth_via_cli(monkeypatch, sample):
     text = out.read_text(encoding="utf-8")
     assert "TODO: deep" in text
     assert "TODO: deeper" not in text
+
+
+def test_s_via_cli(monkeypatch, sample, capsys, app_out):
+    run_main(monkeypatch, [str(sample / "app.py"), "-s"])
+    assert capsys.readouterr().out == app_out
+
+
+def test_tee_via_cli(monkeypatch, sample, capsys, app_out):
+    out = sample / "cli_tee_out.txt"
+    run_main(monkeypatch, [str(sample / "app.py"), "-o", str(out), "--tee"])
+    assert out.read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out

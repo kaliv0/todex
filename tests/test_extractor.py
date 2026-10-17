@@ -194,20 +194,43 @@ def test_multiple_hits_one_header_and_line_numbers(tmp_path, run):
     assert "body" in text
 
 
-# --- paths / out / binary / errors ---
+# --- paths / out / stdout / tee / binary / errors ---
 def test_f_writes_absolute_path(sample, out, run):
     target = sample / "app.py"
     text = run(target, out, full_path=True)
     assert str(target.absolute()) in text
 
 
-def test_o_dir_writes_todo_inside(sample):
+def test_o_dir_writes_todo_inside(sample, app_out):
     reports = sample / "reports"
     reports.mkdir()
     Extractor(path=sample / "app.py", out=str(reports)).run()
-    todo = reports / "TODO"
-    assert todo.is_file()
-    assert "TODO: main" in todo.read_text(encoding="utf-8")
+    assert (reports / "TODO").read_text(encoding="utf-8") == app_out
+
+
+def test_omitted_out_defaults_to_todo(sample, monkeypatch, app_out):
+    monkeypatch.chdir(sample)
+    Extractor(path="app.py").run()
+    assert (sample / "TODO").read_text(encoding="utf-8") == app_out
+
+
+def test_s_writes_to_stdout_only(sample, capsys, app_out):
+    Extractor(path=sample / "app.py", stdout=True).run()
+    assert capsys.readouterr().out == app_out
+    assert not (sample / "TODO").exists()
+
+
+def test_tee_writes_stdout_and_file(sample, out, capsys, app_out):
+    Extractor(path=sample / "app.py", out=str(out), tee=True).run()
+    assert out.read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out
+
+
+def test_tee_without_out_uses_todo(sample, monkeypatch, capsys, app_out):
+    monkeypatch.chdir(sample)
+    Extractor(path="app.py", tee=True).run()
+    assert (sample / "TODO").read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out
 
 
 def test_does_not_rescan_output_file(sample):

@@ -9,6 +9,11 @@ TESTDATA = Path(__file__).parent / "testdata"
 
 
 @pytest.fixture
+def app_out() -> str:
+    return "======================\napp.py\n\tline 1: # TODO: main\n\tline 2: # FIXME: bug\n"
+
+
+@pytest.fixture
 def sample(tmp_path: Path) -> Path:
     # copy the sample project tree into an isolated temp dir
     dest = tmp_path / "project"
