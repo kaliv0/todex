@@ -11,12 +11,12 @@ def run_main(monkeypatch, argv: list[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    "short, flag, needs",
+    "concise, flag, needs",
     [("-i", "-i/--ignore-default", "-t/--tokens"), ("-m20", "-m/--max-depth", "-r/--recursive")],
 )
-def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, short, flag, needs):
+def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, concise, flag, needs):
     with pytest.raises(SystemExit) as exc:
-        run_main(monkeypatch, [short, str(tmp_path)])
+        run_main(monkeypatch, [concise, str(tmp_path)])
     assert exc.value.code == 2
     err = capsys.readouterr().err
     assert err == f"todex: error: {flag} flag requires {needs}\n"

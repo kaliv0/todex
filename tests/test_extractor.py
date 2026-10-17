@@ -121,9 +121,9 @@ def test_without_r_skips_nested(sample, out, run):
     assert "TODO: main" in text
 
 
-# --- short / snippets ---
-def test_s_omits_snippet_body(sample, out, run):
-    text = run(sample / "snippet.py", out, short=True)
+# --- concise / snippets ---
+def test_c_omits_snippet_body(sample, out, run):
+    text = run(sample / "snippet.py", out, concise=True)
     assert "FIXME" in text
     assert "return 1" not in text
 
