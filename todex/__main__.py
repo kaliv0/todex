@@ -15,7 +15,7 @@ from functools import cached_property
 from typing import ClassVar
 
 from todex import __version__
-from todex.extractor import DEFAULT_OUT, Extractor
+from todex.extractor import Extractor
 
 TRASH = r"""
        ________________   ___/-\___     ___/-\___     ___/-\___
@@ -66,10 +66,19 @@ class ArgValidator:
             if not isinstance(action, (_HelpAction, _VersionAction)) and action.option_strings
         }
 
-    def validate_dependent_flags(self) -> None:
-        for flag, needs in self.DEPENDENT_FLAGS.items():
-            if getattr(self.args, flag) and not getattr(self.args, needs):
-                self.parser.error(f"{self.attrs_to_flags[flag]} flag requires {self.attrs_to_flags[needs]}")
+    def validate(self) -> None:
+        self._validate_dependent_flags()
+        self._validate_output_streams()
+
+    def _validate_dependent_flags(self) -> None:
+        for name, needs in self.DEPENDENT_FLAGS.items():
+            if getattr(self.args, name) and not getattr(self.args, needs):
+                self.parser.error(f"{self.attrs_to_flags[name]} flag requires {self.attrs_to_flags[needs]}")
+
+    def _validate_output_streams(self) -> None:
+        stdout, out, tee = self.args.stdout, self.args.out, self.args.tee
+        if stdout and (out or tee):
+            self.parser.error("shouldn't mix --stdout and --out or --tee flags")
 
 
 def require_positive_int(value: str) -> int:
@@ -141,10 +150,10 @@ the extractor will include multiline snippet with the length specified between t
     )
     parser.add_argument("-f", "--full-path", action="store_true", help="display absolute dir/file path")
     parser.add_argument(
-        "-s",
-        "--short",
+        "-c",
+        "--concise",
         action="store_true",
-        help="display only token messages e.g. '#TODO: after release', ignore longer snippets",
+        help="display only token messages e.g. '#TODO{5}: after release', ignore longer snippets",
     )
     parser.add_argument(
         "-r",
@@ -168,13 +177,14 @@ the extractor will include multiline snippet with the length specified between t
     parser.add_argument(
         "-o",
         "--out",
-        default=DEFAULT_OUT,
-        help="path to output file, if existing dir is passed instead - TODO out file will be saved inside",
+        help="path to output file - if existing dir is passed instead TODO out file will be saved inside the path",
     )
+    parser.add_argument("-s", "--stdout", action="store_true", help="output result to stdout")
+    parser.add_argument("--tee", action="store_true", help="output result to stdout and save to file")
     parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
-    ArgValidator(parser, args).validate_dependent_flags()
+    ArgValidator(parser, args).validate()
 
     try:
         Extractor(**vars(args)).run()
