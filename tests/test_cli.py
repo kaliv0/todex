@@ -7,6 +7,8 @@ from todex.__main__ import main
 
 def run_main(monkeypatch, argv: list[str]) -> None:
     monkeypatch.setattr(sys, "argv", ["todex", *argv])
+    # main() finally closes stdout -> don't kill pytest capture
+    monkeypatch.setattr(sys.stdout, "close", lambda: None)
     main()
 
 
@@ -91,7 +93,6 @@ def test_s_broken_pipe_via_debug_exits_141(monkeypatch, sample):
         raise BrokenPipeError
 
     monkeypatch.setattr(sys.stdout, "write", boom)
-    monkeypatch.setattr(sys.stdout, "close", lambda: None)  # don't kill pytest capture
     with pytest.raises(SystemExit) as exc:
         run_main(monkeypatch, [str(sample / "app.py"), "-s", "-d"])
     assert exc.value.code == 141

@@ -190,15 +190,16 @@ the extractor will include multiline snippet with the length specified between t
     try:
         Extractor(**vars(args)).run()
     except BrokenPipeError:
-        # avoid "Exception ignored while flushing sys.stdout" on shutdown
-        with contextlib.suppress(BrokenPipeError):
-            sys.stdout.close()
         sys.exit(141)
     except KeyboardInterrupt:
         sys.exit(130)
     except (OSError, TypeError, ValueError) as e:
         traceback.print_exception(e, limit=0, file=sys.stderr)
         sys.exit(1)
+    finally:
+        # avoid "Exception ignored while flushing sys.stdout" on shutdown
+        with contextlib.suppress(BrokenPipeError):
+            sys.stdout.close()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import TextIO
 
 
+class StopExtractError(Exception):
+    pass
+
+
 class Writer:
     def __init__(self, path: Path | None, to_stdout=False) -> None:
         self.path = path
@@ -22,6 +26,8 @@ class Writer:
                 sys.stdout.flush()
             except BrokenPipeError:
                 self.to_stdout = False
+                if self.path is None:
+                    raise StopExtractError
 
         if self.path:
             f = self._ensure_open()

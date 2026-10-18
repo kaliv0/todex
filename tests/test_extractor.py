@@ -245,6 +245,27 @@ def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
     assert out.read_text(encoding="utf-8") == app_out
 
 
+def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
+    # stdout-only + broken pipe -> StopExtractError
+    for i in range(5):
+        (tmp_path / f"f{i}.py").write_text("# TODO: x\n", encoding="utf-8")
+
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    seen = []
+    orig = Extractor.process_file
+
+    def counted(self, path) -> None:
+        seen.append(path)
+        orig(self, path)
+
+    monkeypatch.setattr(Extractor, "process_file", counted)
+    Extractor(path=tmp_path, stdout=True).run()
+    assert len(seen) == 1
+
+
 def test_does_not_rescan_output_file(sample):
     # NB: Output path must be skipped so a prior TODO file is not re-ingested
     out = sample / "TODO"
