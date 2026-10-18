@@ -77,8 +77,7 @@ class ArgValidator:
                 self.parser.error(f"{self.attrs_to_flags[name]} flag requires {self.attrs_to_flags[needs]}")
 
     def _validate_output_streams(self) -> None:
-        stdout, out, tee = self.args.stdout, self.args.out, self.args.tee
-        if stdout and (out or tee):
+        if self.args.stdout and (self.args.out or self.args.tee):
             self.parser.error("shouldn't mix --stdout and --out or --tee flags")
 
 
