@@ -7,7 +7,7 @@ from textwrap import dedent, indent
 
 from pathspec import PathSpec
 
-from todex.writer import Writer
+from todex.writer import StopExtractError, Writer
 
 DEFAULT_MAX_DEPTH = 120
 DEFAULT_OUT = "TODO"
@@ -24,9 +24,11 @@ class Extractor:
         exclude: list[str] | None = None,
         include_hidden: bool = False,
         use_gitignore: bool = False,
-        out: str = DEFAULT_OUT,
+        stdout: bool = False,
+        tee: bool = False,
+        out: str | None = None,
         full_path: bool = False,
-        short: bool = False,
+        concise: bool = False,
         recursive: bool = False,
         max_depth: int | None = None,
         debug: bool = False,
@@ -34,13 +36,32 @@ class Extractor:
         self.root = Path(path)
         self.token_pattern = self.prepare_token_pattern(tokens or [], ignore_default)
         self.exclude_spec = self.prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
-        self.out = self.prepare_out(out)
+
+        self.stdout = stdout
+        self.tee = tee
+        self.out = self.prepare_out_writer(out or DEFAULT_OUT)
+
         self.full_path = full_path
-        self.short = short
+        self.concise = concise
+
         self.recursive = recursive
         # the CLI sets max_depth to None if omitted so we need to set the default explicitly
         self.max_depth = DEFAULT_MAX_DEPTH if max_depth is None else max_depth
+
         self.debug = __debug__ and debug
+
+    @staticmethod
+    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
+        if not ignore_default:
+            tokens = [*DEFAULT_TOKENS, *tokens]
+
+        if not tokens:
+            # prevented by CLI (-i without -t) but you can never be too careful
+            raise ValueError("no tokens to search for")
+
+        tokens = sorted(dict.fromkeys(tokens), key=len, reverse=True)
+        alternations = "|".join(re.escape(tok) for tok in tokens)
+        return re.compile(rf"(?<!\w)(?:{alternations})(?!\w)", re.IGNORECASE)
 
     def prepare_exclude_spec(self, exclude: list[str], include_hidden: bool, use_gitignore: bool) -> PathSpec:
         if use_gitignore and self.root.is_dir():
@@ -58,27 +79,18 @@ class Extractor:
             return gitignore_file.read_text(encoding="utf-8").splitlines()
         return []
 
-    @staticmethod
-    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
-        if not ignore_default:
-            tokens = [*DEFAULT_TOKENS, *tokens]
+    def prepare_out_writer(self, name: str) -> Writer:
+        if self.stdout:
+            return Writer(path=None, to_stdout=True)
 
-        if not tokens:
-            # prevented by CLI (-i without -t) but you can never be too careful
-            raise ValueError("no tokens to search for")
-
-        tokens = sorted(dict.fromkeys(tokens), key=len, reverse=True)
-        alternations = "|".join(re.escape(tok) for tok in tokens)
-        return re.compile(rf"(?<!\w)(?:{alternations})(?!\w)", re.IGNORECASE)
-
-    @staticmethod
-    def prepare_out(name: str) -> Writer:
         if (path := Path(name)).is_dir():
             path = path / DEFAULT_OUT
-        return Writer(path)
+        return Writer(path, to_stdout=bool(self.tee))
 
     @cached_property
-    def out_path(self) -> Path:
+    def out_path(self) -> Path | None:
+        if self.out.path is None:
+            return None
         return self.out.path.absolute()
 
     def run(self) -> None:
@@ -86,7 +98,8 @@ class Extractor:
             raise FileNotFoundError(f"{self.root} not found")
 
         if self.debug:
-            print("processing:")
+            # it could be simple print() but don't want to mix both out of superstition
+            sys.stdout.write("processing:\n")
         try:
             if self.root.is_file():
                 self.process_file(self.root)
@@ -94,6 +107,9 @@ class Extractor:
                 self.process_dir(self.root, depth=0)
             else:
                 raise ValueError(f"{self.root} must be path to file or dir")
+        except StopExtractError:
+            # e.g. tdx . -s | head 5 -> stop early after 'head' exits
+            pass
         finally:
             self.out.close()
 
@@ -102,7 +118,7 @@ class Extractor:
             return
 
         if self.debug:
-            print(f"\t{self.prepare_path_name(path)}")
+            sys.stdout.write(f"\t{self.prepare_path_name(path)}\n")
 
         try:
             with path.open() as f:
@@ -120,7 +136,7 @@ class Extractor:
                         self.out.write_header(self.prepare_path_name(path))
                         header_added = True
 
-                    if self.short:
+                    if self.concise:
                         line = line[idx:]
                         self.out.write_entry(lines_count, line)
                         continue
@@ -145,7 +161,7 @@ class Extractor:
                     self.out.write_entry(display_line_num, line)
         except UnicodeDecodeError as e:
             if self.debug:
-                print(f"skipping {self.prepare_path_name(path)}:\n{e}", file=sys.stderr)
+                sys.stderr.write(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
 
     def get_snippet_count(self, line: str, start: int, line_num: int) -> int:
         if not line.startswith("{", start):

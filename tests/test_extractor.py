@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from todex.extractor import Extractor
@@ -121,9 +123,9 @@ def test_without_r_skips_nested(sample, out, run):
     assert "TODO: main" in text
 
 
-# --- short / snippets ---
-def test_s_omits_snippet_body(sample, out, run):
-    text = run(sample / "snippet.py", out, short=True)
+# --- concise / snippets ---
+def test_c_omits_snippet_body(sample, out, run):
+    text = run(sample / "snippet.py", out, concise=True)
     assert "FIXME" in text
     assert "return 1" not in text
 
@@ -194,20 +196,74 @@ def test_multiple_hits_one_header_and_line_numbers(tmp_path, run):
     assert "body" in text
 
 
-# --- paths / out / binary / errors ---
+# --- paths / out / stdout / tee / binary / errors ---
 def test_f_writes_absolute_path(sample, out, run):
     target = sample / "app.py"
     text = run(target, out, full_path=True)
     assert str(target.absolute()) in text
 
 
-def test_o_dir_writes_todo_inside(sample):
+def test_o_dir_writes_todo_inside(sample, app_out):
     reports = sample / "reports"
     reports.mkdir()
     Extractor(path=sample / "app.py", out=str(reports)).run()
-    todo = reports / "TODO"
-    assert todo.is_file()
-    assert "TODO: main" in todo.read_text(encoding="utf-8")
+    assert (reports / "TODO").read_text(encoding="utf-8") == app_out
+
+
+def test_omitted_out_defaults_to_todo(sample, monkeypatch, app_out):
+    monkeypatch.chdir(sample)
+    Extractor(path="app.py").run()
+    assert (sample / "TODO").read_text(encoding="utf-8") == app_out
+
+
+def test_s_writes_to_stdout_only(sample, capsys, app_out):
+    Extractor(path=sample / "app.py", stdout=True).run()
+    assert capsys.readouterr().out == app_out
+    assert not (sample / "TODO").exists()
+
+
+def test_tee_writes_stdout_and_file(sample, out, capsys, app_out):
+    Extractor(path=sample / "app.py", out=str(out), tee=True).run()
+    assert out.read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out
+
+
+def test_tee_without_out_uses_todo(sample, monkeypatch, capsys, app_out):
+    monkeypatch.chdir(sample)
+    Extractor(path="app.py", tee=True).run()
+    assert (sample / "TODO").read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out
+
+
+def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
+    # pipe reader gone -> stdout fails, file side still gets the full result
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    Extractor(path=sample / "app.py", out=str(out), tee=True).run()
+    assert out.read_text(encoding="utf-8") == app_out
+
+
+def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
+    # stdout-only + broken pipe -> StopExtractError
+    for i in range(5):
+        (tmp_path / f"f{i}.py").write_text("# TODO: x\n", encoding="utf-8")
+
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    seen = []
+    orig = Extractor.process_file
+
+    def counted(self, path) -> None:
+        seen.append(path)
+        orig(self, path)
+
+    monkeypatch.setattr(Extractor, "process_file", counted)
+    Extractor(path=tmp_path, stdout=True).run()
+    assert len(seen) == 1
 
 
 def test_does_not_rescan_output_file(sample):

@@ -7,19 +7,33 @@ from todex.__main__ import main
 
 def run_main(monkeypatch, argv: list[str]) -> None:
     monkeypatch.setattr(sys, "argv", ["todex", *argv])
+    # main() finally closes stdout -> don't kill pytest capture
+    monkeypatch.setattr(sys.stdout, "close", lambda: None)
     main()
 
 
 @pytest.mark.parametrize(
-    "short, flag, needs",
+    "arg, name, needs",
     [("-i", "-i/--ignore-default", "-t/--tokens"), ("-m20", "-m/--max-depth", "-r/--recursive")],
 )
-def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, short, flag, needs):
+def test_missing_dependent_flag_errors(monkeypatch, tmp_path, capsys, arg, name, needs):
     with pytest.raises(SystemExit) as exc:
-        run_main(monkeypatch, [short, str(tmp_path)])
+        run_main(monkeypatch, [arg, str(tmp_path)])
     assert exc.value.code == 2
     err = capsys.readouterr().err
-    assert err == f"todex: error: {flag} flag requires {needs}\n"
+    assert err == f"todex: error: {name} flag requires {needs}\n"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["-s", "-o", "x"], ["-s", "--tee"]],
+)
+def test_stdout_mix_errors(monkeypatch, tmp_path, capsys, extra):
+    with pytest.raises(SystemExit) as exc:
+        run_main(monkeypatch, [str(tmp_path), *extra])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert err == "todex: error: shouldn't mix --stdout and --out or --tee flags\n"
 
 
 @pytest.mark.parametrize(
@@ -59,3 +73,26 @@ def test_r_m_limits_depth_via_cli(monkeypatch, sample):
     text = out.read_text(encoding="utf-8")
     assert "TODO: deep" in text
     assert "TODO: deeper" not in text
+
+
+def test_s_via_cli(monkeypatch, sample, capsys, app_out):
+    run_main(monkeypatch, [str(sample / "app.py"), "-s"])
+    assert capsys.readouterr().out == app_out
+
+
+def test_tee_via_cli(monkeypatch, sample, capsys, app_out):
+    out = sample / "cli_tee_out.txt"
+    run_main(monkeypatch, [str(sample / "app.py"), "-o", str(out), "--tee"])
+    assert out.read_text(encoding="utf-8") == app_out
+    assert capsys.readouterr().out == app_out
+
+
+def test_s_broken_pipe_via_debug_exits_141(monkeypatch, sample):
+    # -d writes stdout outside Writer -> BrokenPipeError reaches main
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    with pytest.raises(SystemExit) as exc:
+        run_main(monkeypatch, [str(sample / "app.py"), "-s", "-d"])
+    assert exc.value.code == 141
