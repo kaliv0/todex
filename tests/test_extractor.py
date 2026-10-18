@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from todex.extractor import Extractor
@@ -231,6 +233,16 @@ def test_tee_without_out_uses_todo(sample, monkeypatch, capsys, app_out):
     Extractor(path="app.py", tee=True).run()
     assert (sample / "TODO").read_text(encoding="utf-8") == app_out
     assert capsys.readouterr().out == app_out
+
+
+def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
+    # pipe reader gone -> stdout fails, file side still gets the full result
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    Extractor(path=sample / "app.py", out=str(out), tee=True).run()
+    assert out.read_text(encoding="utf-8") == app_out
 
 
 def test_does_not_rescan_output_file(sample):

@@ -83,3 +83,15 @@ def test_tee_via_cli(monkeypatch, sample, capsys, app_out):
     run_main(monkeypatch, [str(sample / "app.py"), "-o", str(out), "--tee"])
     assert out.read_text(encoding="utf-8") == app_out
     assert capsys.readouterr().out == app_out
+
+
+def test_s_broken_pipe_via_debug_exits_141(monkeypatch, sample):
+    # -d writes stdout outside Writer -> BrokenPipeError reaches main
+    def boom(_text: str) -> int:
+        raise BrokenPipeError
+
+    monkeypatch.setattr(sys.stdout, "write", boom)
+    monkeypatch.setattr(sys.stdout, "close", lambda: None)  # don't kill pytest capture
+    with pytest.raises(SystemExit) as exc:
+        run_main(monkeypatch, [str(sample / "app.py"), "-s", "-d"])
+    assert exc.value.code == 141

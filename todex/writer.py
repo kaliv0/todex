@@ -8,30 +8,33 @@ class Writer:
         self.path = path
         self.to_stdout = to_stdout
         self.file: TextIO | None = None
-        self._streams: list[TextIO] = []
-
-    @property
-    def streams(self) -> list[TextIO]:
-        if not self._streams:
-            if self.to_stdout:
-                self._streams.append(sys.stdout)
-
-            if self.path:
-                # buffering=1 forces line-buffering so logs sync immediately
-                self.file = self.path.open("w", encoding="utf-8", buffering=1)
-                self._streams.append(self.file)
-        return self._streams
 
     def write_header(self, path: str) -> None:
-        for f in self.streams:
-            f.write(f"======================\n{path}\n")
+        self._write(f"======================\n{path}\n")
 
     def write_entry(self, lines_count: int, line: str) -> None:
-        for f in self.streams:
-            f.write(f"\tline {lines_count}: {line}")
+        self._write(f"\tline {lines_count}: {line}")
+
+    def _write(self, text: str) -> None:
+        if self.to_stdout:
+            try:
+                sys.stdout.write(text)
+                sys.stdout.flush()
+            except BrokenPipeError:
+                self.to_stdout = False
+
+        if self.path:
+            f = self._ensure_open()
+            f.write(text)
+            f.flush()
+
+    def _ensure_open(self) -> TextIO:
+        if self.file is None:
+            assert self.path is not None  # we shouldn't be here just to make mypy happy
+            self.file = self.path.open("w", encoding="utf-8")
+        return self.file
 
     def close(self) -> None:
         if self.file:
             self.file.close()
-            self.file = None
-        self._streams.clear()
+            self.file = None  # for just in case
