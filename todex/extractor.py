@@ -1,5 +1,4 @@
 import re
-import sys
 from functools import cached_property
 from pathlib import Path
 from re import Pattern
@@ -7,7 +6,7 @@ from textwrap import dedent, indent
 
 from pathspec import PathSpec
 
-from todex.writer import StopExtractError, Writer
+from todex.writer import StopExtractionError, Writer
 
 DEFAULT_MAX_DEPTH = 120
 DEFAULT_OUT = "TODO"
@@ -85,7 +84,7 @@ class Extractor:
 
         if (path := Path(name)).is_dir():
             path = path / DEFAULT_OUT
-        return Writer(path, to_stdout=bool(self.tee))
+        return Writer(path, to_stdout=self.tee)
 
     @cached_property
     def out_path(self) -> Path | None:
@@ -99,7 +98,7 @@ class Extractor:
 
         if self.debug:
             # it could be simple print() but don't want to mix both out of superstition
-            sys.stdout.write("processing:\n")
+            self.out.debug("processing:\n")
         try:
             if self.root.is_file():
                 self.process_file(self.root)
@@ -107,7 +106,7 @@ class Extractor:
                 self.process_dir(self.root, depth=0)
             else:
                 raise ValueError(f"{self.root} must be path to file or dir")
-        except StopExtractError:
+        except StopExtractionError:
             # e.g. tdx . -s | head 5 -> stop early after 'head' exits
             pass
         finally:
@@ -118,8 +117,7 @@ class Extractor:
             return
 
         if self.debug:
-            sys.stdout.write(f"\t{self.prepare_path_name(path)}\n")
-
+            self.out.debug(f"\t{self.prepare_path_name(path)}\n")
         try:
             with path.open() as f:
                 lines_count = 0
@@ -161,7 +159,7 @@ class Extractor:
                     self.out.write_entry(display_line_num, line)
         except UnicodeDecodeError as e:
             if self.debug:
-                sys.stderr.write(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
+                self.out.error(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
 
     def get_snippet_count(self, line: str, start: int, line_num: int) -> int:
         if not line.startswith("{", start):
