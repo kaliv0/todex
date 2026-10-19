@@ -26,7 +26,7 @@ test:
 build:
 	uv build
 
-publish: build
+publish: clean build
 	uvx uv-publish
 
 clean:
