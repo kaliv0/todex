@@ -4,7 +4,7 @@ help:
 	@echo "Targets:"
 	@echo "  sync         sync all dependencies"
 	@echo "  format       run ruff"
-	@echo "  typecheck    run mypy"
+	@echo "  typecheck    run typecheck"
 	@echo "  test         run pytest"
 	@echo "  build        build project"
 	@echo "  publish      publish to PyPi"
@@ -18,7 +18,7 @@ format:
 	uv run ruff check && uv run ruff format
 
 typecheck:
-	uv run mypy .
+	uv run pyrefly check --min-severity=warn
 
 test:
 	uv run pytest
@@ -30,6 +30,7 @@ publish: build
 	uvx uv-publish
 
 clean:
-	rm -rf .ruff_cache/ .mypy_cache/ .pytest_cache/ dist/
+	rm -rf .ruff_cache/ .pytest_cache/ .pdm-build/ dist/ build/ *.egg-info/
+	find . -path ./.venv -prune -o -type d -name __pycache__ -exec rm -rf {} +
 
 all: sync format typecheck test

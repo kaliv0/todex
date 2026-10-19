@@ -14,7 +14,7 @@ class Writer:
     def __init__(self, path: Path | None, to_stdout=False) -> None:
         self.path = path
         self.to_stdout = to_stdout
-        self.file: TextIO | None = None
+        self.file: TextIO | None = None  # file is set on first write
         self.stdout_writer = PagedStream() if self.to_stdout and sys.stdout.isatty() else sys.stdout
 
     def write_header(self, path: str) -> None:
