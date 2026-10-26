@@ -215,12 +215,13 @@ def test_get_snippet_count_after_token_parses_braces():
         "# TODO{abc}\n",
     ],
 )
-def test_invalid_snippet_raises(tmp_path, content):
+@pytest.mark.parametrize("concise", [False, True], ids=["full", "concise"])
+def test_invalid_snippet_raises(tmp_path, content, concise):
     src = tmp_path / "bad.py"
     out = tmp_path / "out.txt"
     src.write_text(content, encoding="utf-8")
     with pytest.raises(ValueError, match="invalid snippet count"):
-        Extractor(path=src, out=str(out)).run()
+        Extractor(path=src, out=str(out), concise=concise).run()
 
 
 def test_multiple_hits_one_header_and_line_numbers(tmp_path, run):

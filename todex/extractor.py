@@ -145,15 +145,13 @@ class Extractor:
             self.out.write_header(self.prepare_path_name(path))
             header_added = True
 
+        snippet_count = self.get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
         if self.concise:
             self.out.write_entry(lines_count, line[match.start() :])
             return lines_count, header_added
 
         display_line_num = lines_count
-        for _ in range(
-            1,
-            self.get_snippet_count_after_token(line, token_end=match.end(), line_num=display_line_num),
-        ):
+        for _ in range(1, snippet_count):
             if not (next_line := source.readline()):
                 break
             line += next_line
@@ -207,7 +205,7 @@ class Extractor:
         if self.is_excluded(path, is_dir=True) or depth > self.max_depth:
             return
 
-        opts = {"follow_symlinks" : False}
+        opts = {"follow_symlinks": False}
         dirs = []
         for entry in sorted(path.iterdir(), key=lambda x: x.name):
             if entry.is_file(**opts):
