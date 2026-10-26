@@ -3,6 +3,7 @@ import sys
 import pytest
 
 from todex.extractor import Extractor
+from todex.writer import StopExtractionError
 
 
 # --- tokens ---
@@ -246,7 +247,6 @@ def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
 
 
 def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
-    # stdout-only + broken pipe -> StopExtractError
     for i in range(5):
         (tmp_path / f"f{i}.py").write_text("# TODO: x\n", encoding="utf-8")
 
@@ -262,7 +262,8 @@ def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
         orig(self, path)
 
     monkeypatch.setattr(Extractor, "process_file", counted)
-    Extractor(path=tmp_path, stdout=True).run()
+    with pytest.raises(StopExtractionError):
+        Extractor(path=tmp_path, stdout=True).run()
     assert len(seen) == 1
 
 
@@ -279,6 +280,15 @@ def test_does_not_rescan_output_file(sample):
     assert "TODO: main" in text
 
 
+def test_zero_hit_scan_truncates_stale_out(tmp_path):
+    src = tmp_path / "empty.py"
+    src.write_text("print(1)\n", encoding="utf-8")
+    out = tmp_path / "out.txt"
+    out.write_text("stale from previous run\n", encoding="utf-8")
+    Extractor(path=src, out=str(out)).run()
+    assert out.read_text(encoding="utf-8") == ""
+
+
 def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
     (tmp_path / "good.py").write_text("# TODO: keep me\n", encoding="utf-8")
     (tmp_path / "bad.bin").write_bytes(b"\xff\xfe TODO: binary\n")
@@ -287,6 +297,7 @@ def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
     err = capsys.readouterr().err
     assert "skipping" in err
     assert "bad.bin" in err
+    assert "utf-8" in err
 
 
 def test_missing_path_raises(tmp_path):

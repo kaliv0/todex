@@ -6,7 +6,7 @@ from textwrap import dedent, indent
 
 from pathspec import PathSpec
 
-from todex.writer import StopExtractionError, Writer
+from todex.writer import Writer
 
 DEFAULT_MAX_DEPTH = 120
 DEFAULT_OUT = "TODO"
@@ -106,9 +106,8 @@ class Extractor:
                 self.process_dir(self.root, depth=0)
             else:
                 raise ValueError(f"{self.root} must be path to file or dir")
-        except StopExtractionError:
-            # e.g. tdx . -s | head 5 -> stop early after 'head' exits
-            pass
+        # tdx . -s | head 5 -> stop early after 'head' exits raises StopExtractionError
+        #   -> we let it propagate automatically
         finally:
             self.out.close()
 
@@ -119,7 +118,7 @@ class Extractor:
         if self.debug:
             self.out.debug(f"\t{self.prepare_path_name(path)}\n")
         try:
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 lines_count = 0
                 header_added = False
                 while line := f.readline():
