@@ -207,11 +207,12 @@ class Extractor:
         if self.is_excluded(path, is_dir=True) or depth > self.max_depth:
             return
 
+        opts = {"follow_symlinks" : False}
         dirs = []
         for entry in sorted(path.iterdir(), key=lambda x: x.name):
-            if entry.is_file():
+            if entry.is_file(**opts):
                 self.process_file(entry)
-            elif self.recursive and entry.is_dir():
+            elif self.recursive and entry.is_dir(**opts):
                 dirs.append(entry)
 
         for dir_ in dirs:

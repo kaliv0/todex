@@ -137,6 +137,34 @@ def test_without_r_skips_nested(sample, out, run):
     assert "TODO: main" in text
 
 
+@pytest.mark.parametrize(
+    "link_name, target_is_dir, recursive, hidden",
+    [
+        ("linkdir", True, True, "TODO: through-symlink"),
+        ("link.py", False, False, "TODO: via-file-link"),
+    ],
+    ids=["dir", "file"],
+)
+def test_symlink_not_followed(tmp_path, link_name, target_is_dir, recursive, hidden):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if target_is_dir:
+        (outside / "via_link.py").write_text(f"# {hidden}\n", encoding="utf-8")
+        target = outside
+    else:
+        target = outside / "target.py"
+        target.write_text(f"# {hidden}\n", encoding="utf-8")
+    scan = tmp_path / "scan"
+    scan.mkdir()
+    (scan / "top.py").write_text("# TODO: top\n", encoding="utf-8")
+    (scan / link_name).symlink_to(target)
+    out = scan / "out.txt"
+    Extractor(path=scan, out=str(out), recursive=recursive).run()
+    text = out.read_text(encoding="utf-8")
+    assert "TODO: top" in text
+    assert hidden not in text
+
+
 # --- concise / snippets ---
 def test_c_omits_snippet_body(sample, out, run):
     text = run(sample / "snippet.py", out, concise=True)
