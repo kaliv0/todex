@@ -112,8 +112,10 @@ def test_dir_walk_order_files_then_dirs_by_name(tmp_path):
     nested = tmp_path / "d"
     nested.mkdir()
     (nested / "z.py").write_text("# TODO: nested\n", encoding="utf-8")
+
     out = tmp_path / "out.txt"
     Extractor(path=tmp_path, out=str(out), recursive=True).run()
+
     text = out.read_text(encoding="utf-8")
     assert text.index("TODO: a.py") < text.index("TODO: b.py") < text.index("TODO: c.py")
     assert text.index("TODO: c.py") < text.index("TODO: nested")
@@ -154,12 +156,15 @@ def test_symlink_not_followed(tmp_path, link_name, target_is_dir, recursive, hid
     else:
         target = outside / "target.py"
         target.write_text(f"# {hidden}\n", encoding="utf-8")
+
     scan = tmp_path / "scan"
     scan.mkdir()
     (scan / "top.py").write_text("# TODO: top\n", encoding="utf-8")
     (scan / link_name).symlink_to(target)
+
     out = scan / "out.txt"
     Extractor(path=scan, out=str(out), recursive=recursive).run()
+
     text = out.read_text(encoding="utf-8")
     assert "TODO: top" in text
     assert hidden not in text
@@ -337,6 +342,7 @@ def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
     (tmp_path / "bad.bin").write_bytes(b"\xff\xfe TODO: binary\n")
     text = run(tmp_path, tmp_path / "out.txt", debug=True)
     assert "TODO: keep me" in text
+
     err = capsys.readouterr().err
     assert "skipping" in err
     assert "bad.bin" in err

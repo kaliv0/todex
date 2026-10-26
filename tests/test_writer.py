@@ -23,6 +23,7 @@ def test_tty_buffers_and_pages_on_close(tty, monkeypatch):
 
     w = Writer(path=None, to_stdout=True)
     assert isinstance(w.stdout_writer, PagedStream)
+
     w.write_header("a.py")
     w.write_entry(1, "# TODO: x\n")
     assert seen == []
@@ -37,6 +38,7 @@ def test_tty_error_goes_to_pager_buffer(tty, monkeypatch):
 
     w = Writer(path=None, to_stdout=True)
     assert isinstance(w.stdout_writer, PagedStream)
+
     w.error("boom\n")
     w.close()
     assert seen == ["boom\n"]
