@@ -3,10 +3,11 @@ from functools import cached_property
 from pathlib import Path
 from re import Pattern
 from textwrap import dedent, indent
+from typing import TextIO
 
 from pathspec import PathSpec
 
-from todex.writer import StopExtractionError, Writer
+from todex.writer import Writer
 
 DEFAULT_MAX_DEPTH = 120
 DEFAULT_OUT = "TODO"
@@ -106,9 +107,7 @@ class Extractor:
                 self.process_dir(self.root, depth=0)
             else:
                 raise ValueError(f"{self.root} must be path to file or dir")
-        except StopExtractionError:
-            # e.g. tdx . -s | head 5 -> stop early after 'head' exits
-            pass
+        # tdx . -s | head 5 -> let StopExtractionError propagate automatically
         finally:
             self.out.close()
 
@@ -119,65 +118,77 @@ class Extractor:
         if self.debug:
             self.out.debug(f"\t{self.prepare_path_name(path)}\n")
         try:
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 lines_count = 0
                 header_added = False
                 while line := f.readline():
                     lines_count += 1
-
                     if not (match := self.token_pattern.search(line)):
                         continue
-                    token = match.group()
-                    idx = match.start()
-
-                    if not header_added:
-                        self.out.write_header(self.prepare_path_name(path))
-                        header_added = True
-
-                    if self.concise:
-                        line = line[idx:]
-                        self.out.write_entry(lines_count, line)
-                        continue
-
-                    display_line_num = lines_count
-                    for _ in range(
-                        1,
-                        self.get_snippet_count(line, start=idx + len(token), line_num=display_line_num),
-                    ):
-                        if not (next_line := f.readline()):
-                            break
-                        line += next_line
-                        lines_count += 1
-
-                    if not line.endswith("\n"):
-                        line += "\n"  # this is the last or only line in the file
-
-                    if display_line_num != lines_count:  # add full snippets
-                        line = indent(dedent("\n" + line), "\t\t")
-                    else:
-                        line = dedent(line)
-                    self.out.write_entry(display_line_num, line)
+                    lines_count, header_added = self.write_hit(
+                        f, path, line, lines_count, match, header_added
+                    )
         except UnicodeDecodeError as e:
             if self.debug:
                 self.out.error(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
 
-    def get_snippet_count(self, line: str, start: int, line_num: int) -> int:
-        if not line.startswith("{", start):
+    def write_hit(
+        self,
+        source: TextIO,
+        path: Path,
+        line: str,
+        lines_count: int,
+        match: re.Match[str],
+        header_added: bool,
+    ) -> tuple[int, bool]:
+        if not header_added:
+            self.out.write_header(self.prepare_path_name(path))
+            header_added = True
+
+        snippet_count = self.get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
+        if self.concise:
+            self.out.write_entry(lines_count, line[match.start() :])
+            return lines_count, header_added
+
+        display_line_num = lines_count
+        for _ in range(1, snippet_count):
+            if not (next_line := source.readline()):
+                break
+            line += next_line
+            lines_count += 1
+
+        self.out.write_entry(
+            display_line_num,
+            self.format_snippet_entry(line, multi=display_line_num != lines_count),
+        )
+        return lines_count, header_added
+
+    @staticmethod
+    def format_snippet_entry(line: str, multi: bool) -> str:
+        if not line.endswith("\n"):
+            line += "\n"  # this is the last or only line in the file
+        if multi:
+            return indent(dedent("\n" + line), "\t\t")
+        return dedent(line)
+
+    def get_snippet_count_after_token(self, line: str, token_end: int, line_num: int) -> int:
+        if not line.startswith("{", token_end):
             return 1
 
         # advance pointer to actual count
-        start = start + 1
+        start = token_end + 1
         if (end := line[start:].find("}")) == -1:
-            err = ValueError("invalid snippet count")
+            err = ValueError("invalid snippet count: unclosed '{'")
             self._add_debug_note(err, line, line_num)
             raise err
 
+        body = line[start : start + end]
         try:
-            snippet_count = int(line[start : start + end])
-        except ValueError as err:
+            return int(body)
+        except ValueError:
+            err = ValueError(f"invalid snippet count: {body!r}")
             self._add_debug_note(err, line, line_num)
-            raise
-        return snippet_count
+            raise err
 
     def _add_debug_note(self, err: Exception, line: str, line_num: int) -> None:
         if self.debug:
@@ -194,11 +205,12 @@ class Extractor:
         if self.is_excluded(path, is_dir=True) or depth > self.max_depth:
             return
 
+        opts = {"follow_symlinks": False}
         dirs = []
-        for entry in path.iterdir():
-            if entry.is_file():
+        for entry in sorted(path.iterdir(), key=lambda x: x.name):
+            if entry.is_file(**opts):
                 self.process_file(entry)
-            elif self.recursive and entry.is_dir():
+            elif self.recursive and entry.is_dir(**opts):
                 dirs.append(entry)
 
         for dir_ in dirs:

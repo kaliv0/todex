@@ -1,4 +1,3 @@
-import os
 import pydoc
 import sys
 from io import StringIO
@@ -10,12 +9,33 @@ class StopExtractionError(Exception):
     pass
 
 
+class PagedStream:
+    def __init__(self) -> None:
+        self._buffer = StringIO()
+
+    def write(self, data: str) -> int:
+        return self._buffer.write(data)
+
+    def page(self) -> None:
+        pydoc.pager(self._buffer.getvalue())
+
+
 class Writer:
     def __init__(self, path: Path | None, to_stdout=False) -> None:
         self.path = path
         self.to_stdout = to_stdout
-        self.file: TextIO | None = None  # file is set on first write
-        self.stdout_writer = PagedStream() if self.to_stdout and sys.stdout.isatty() else sys.stdout
+        self.file = self.prepare_file()
+        self.stdout_writer = self.prepare_stdout_writer()
+
+    def prepare_file(self) -> TextIO | None:
+        if self.path:
+            return self.path.open("w", encoding="utf-8")
+        return None
+
+    def prepare_stdout_writer(self) -> PagedStream | TextIO:
+        if self.to_stdout and sys.stdout.isatty():
+            return PagedStream()
+        return sys.stdout
 
     def write_header(self, path: str) -> None:
         self._write(f"======================\n{path}\n")
@@ -45,9 +65,7 @@ class Writer:
                 if self.path is None:
                     raise StopExtractionError
 
-        if self.path:
-            if self.file is None:
-                self.file = self.path.open("w", encoding="utf-8")
+        if self.file is not None:
             self.file.write(text)
             self.file.flush()
 
@@ -58,18 +76,3 @@ class Writer:
         if self.file:
             self.file.close()
             self.file = None  # for just in case
-
-
-class PagedStream:
-    def __init__(self) -> None:
-        self._buffer = StringIO()
-
-    def write(self, data: str) -> int:
-        return self._buffer.write(data)
-
-    def page(self) -> None:
-        # set less when actually calling the pager
-        if "LESS" not in os.environ:
-            os.environ["LESS"] = "-RF"
-
-        pydoc.pager(self._buffer.getvalue())

@@ -3,6 +3,7 @@ import sys
 import pytest
 
 from todex.extractor import Extractor
+from todex.writer import StopExtractionError
 
 
 # --- tokens ---
@@ -105,6 +106,21 @@ def test_file_path_g_is_noop_but_still_processes(sample, out, run):
 
 
 # --- recursion ---
+def test_dir_walk_order_files_then_dirs_by_name(tmp_path):
+    for name in ("c.py", "a.py", "b.py"):
+        (tmp_path / name).write_text(f"# TODO: {name}\n", encoding="utf-8")
+    nested = tmp_path / "d"
+    nested.mkdir()
+    (nested / "z.py").write_text("# TODO: nested\n", encoding="utf-8")
+
+    out = tmp_path / "out.txt"
+    Extractor(path=tmp_path, out=str(out), recursive=True).run()
+
+    text = out.read_text(encoding="utf-8")
+    assert text.index("TODO: a.py") < text.index("TODO: b.py") < text.index("TODO: c.py")
+    assert text.index("TODO: c.py") < text.index("TODO: nested")
+
+
 def test_r_finds_nested(sample, out, run):
     text = run(sample, out, recursive=True)
     assert "TODO: deep" in text
@@ -121,6 +137,37 @@ def test_without_r_skips_nested(sample, out, run):
     text = run(sample, out)
     assert "TODO: deep" not in text
     assert "TODO: main" in text
+
+
+@pytest.mark.parametrize(
+    "link_name, target_is_dir, recursive, hidden",
+    [
+        ("linkdir", True, True, "TODO: through-symlink"),
+        ("link.py", False, False, "TODO: via-file-link"),
+    ],
+    ids=["dir", "file"],
+)
+def test_symlink_not_followed(tmp_path, link_name, target_is_dir, recursive, hidden):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if target_is_dir:
+        (outside / "via_link.py").write_text(f"# {hidden}\n", encoding="utf-8")
+        target = outside
+    else:
+        target = outside / "target.py"
+        target.write_text(f"# {hidden}\n", encoding="utf-8")
+
+    scan = tmp_path / "scan"
+    scan.mkdir()
+    (scan / "top.py").write_text("# TODO: top\n", encoding="utf-8")
+    (scan / link_name).symlink_to(target)
+
+    out = scan / "out.txt"
+    Extractor(path=scan, out=str(out), recursive=recursive).run()
+
+    text = out.read_text(encoding="utf-8")
+    assert "TODO: top" in text
+    assert hidden not in text
 
 
 # --- concise / snippets ---
@@ -154,30 +201,32 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
     assert "only one more" in text
 
 
-def test_get_snippet_count_default_one():
+def test_get_snippet_count_after_token_default_one():
     line = "# TODO: x"
-    start = line.index("TODO") + len("TODO")
-    assert Extractor(path=".").get_snippet_count(line, start=start, line_num=1) == 1
+    token_end = line.index("TODO") + len("TODO")
+    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 1
 
 
-def test_get_snippet_count_parses_braces():
+def test_get_snippet_count_after_token_parses_braces():
     line = "# TODO{3} x"
-    assert Extractor(path=".").get_snippet_count(line, start=line.index("{"), line_num=1) == 3
+    token_end = line.index("TODO") + len("TODO")
+    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 3
 
 
 @pytest.mark.parametrize(
-    "content, match",
+    "content",
     [
-        ("# TODO{3 no close\n", "invalid snippet count"),
-        ("# TODO{abc}\n", None),
+        "# TODO{3 no close\n",
+        "# TODO{abc}\n",
     ],
 )
-def test_invalid_snippet_raises(tmp_path, content, match):
+@pytest.mark.parametrize("concise", [False, True], ids=["full", "concise"])
+def test_invalid_snippet_raises(tmp_path, content, concise):
     src = tmp_path / "bad.py"
     out = tmp_path / "out.txt"
     src.write_text(content, encoding="utf-8")
-    with pytest.raises(ValueError, match=match):
-        Extractor(path=src, out=str(out)).run()
+    with pytest.raises(ValueError, match="invalid snippet count"):
+        Extractor(path=src, out=str(out), concise=concise).run()
 
 
 def test_multiple_hits_one_header_and_line_numbers(tmp_path, run):
@@ -246,7 +295,6 @@ def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
 
 
 def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
-    # stdout-only + broken pipe -> StopExtractError
     for i in range(5):
         (tmp_path / f"f{i}.py").write_text("# TODO: x\n", encoding="utf-8")
 
@@ -262,7 +310,8 @@ def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
         orig(self, path)
 
     monkeypatch.setattr(Extractor, "process_file", counted)
-    Extractor(path=tmp_path, stdout=True).run()
+    with pytest.raises(StopExtractionError):
+        Extractor(path=tmp_path, stdout=True).run()
     assert len(seen) == 1
 
 
@@ -279,14 +328,25 @@ def test_does_not_rescan_output_file(sample):
     assert "TODO: main" in text
 
 
+def test_zero_hit_scan_truncates_stale_out(tmp_path):
+    src = tmp_path / "empty.py"
+    src.write_text("print(1)\n", encoding="utf-8")
+    out = tmp_path / "out.txt"
+    out.write_text("stale from previous run\n", encoding="utf-8")
+    Extractor(path=src, out=str(out)).run()
+    assert out.read_text(encoding="utf-8") == ""
+
+
 def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
     (tmp_path / "good.py").write_text("# TODO: keep me\n", encoding="utf-8")
     (tmp_path / "bad.bin").write_bytes(b"\xff\xfe TODO: binary\n")
     text = run(tmp_path, tmp_path / "out.txt", debug=True)
     assert "TODO: keep me" in text
+
     err = capsys.readouterr().err
     assert "skipping" in err
     assert "bad.bin" in err
+    assert "utf-8" in err
 
 
 def test_missing_path_raises(tmp_path):

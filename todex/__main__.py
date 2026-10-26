@@ -17,6 +17,7 @@ from typing import ClassVar
 
 from todex import __version__
 from todex.extractor import Extractor
+from todex.writer import StopExtractionError
 
 TRASH = r"""
        ________________   ___/-\___     ___/-\___     ___/-\___
@@ -188,7 +189,7 @@ the extractor will include multiline snippet with the length specified between t
 
     try:
         Extractor(**vars(args)).run()
-    except BrokenPipeError:
+    except (BrokenPipeError, StopExtractionError):
         sys.exit(141)
     except KeyboardInterrupt:
         sys.exit(130)
