@@ -106,6 +106,19 @@ def test_file_path_g_is_noop_but_still_processes(sample, out, run):
 
 
 # --- recursion ---
+def test_dir_walk_order_files_then_dirs_by_name(tmp_path):
+    for name in ("c.py", "a.py", "b.py"):
+        (tmp_path / name).write_text(f"# TODO: {name}\n", encoding="utf-8")
+    nested = tmp_path / "d"
+    nested.mkdir()
+    (nested / "z.py").write_text("# TODO: nested\n", encoding="utf-8")
+    out = tmp_path / "out.txt"
+    Extractor(path=tmp_path, out=str(out), recursive=True).run()
+    text = out.read_text(encoding="utf-8")
+    assert text.index("TODO: a.py") < text.index("TODO: b.py") < text.index("TODO: c.py")
+    assert text.index("TODO: c.py") < text.index("TODO: nested")
+
+
 def test_r_finds_nested(sample, out, run):
     text = run(sample, out, recursive=True)
     assert "TODO: deep" in text

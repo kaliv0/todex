@@ -194,7 +194,7 @@ class Extractor:
             return
 
         dirs = []
-        for entry in path.iterdir():
+        for entry in sorted(path.iterdir(), key=lambda x: x.name):
             if entry.is_file():
                 self.process_file(entry)
             elif self.recursive and entry.is_dir():
