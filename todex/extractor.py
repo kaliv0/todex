@@ -141,7 +141,8 @@ class Extractor:
                     display_line_num = lines_count
                     for _ in range(
                         1,
-                        self.get_snippet_count(line, start=idx + len(token), line_num=display_line_num),
+                        self.get_snippet_count_after_token(
+                            line, token_end=idx + len(token), line_num=display_line_num),
                     ):
                         if not (next_line := f.readline()):
                             break
@@ -160,23 +161,24 @@ class Extractor:
             if self.debug:
                 self.out.error(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
 
-    def get_snippet_count(self, line: str, start: int, line_num: int) -> int:
-        if not line.startswith("{", start):
+    def get_snippet_count_after_token(self, line: str, token_end: int, line_num: int) -> int:
+        if not line.startswith("{", token_end):
             return 1
 
         # advance pointer to actual count
-        start = start + 1
+        start = token_end + 1
         if (end := line[start:].find("}")) == -1:
-            err = ValueError("invalid snippet count")
+            err = ValueError("invalid snippet count: unclosed '{'")
             self._add_debug_note(err, line, line_num)
             raise err
 
+        body = line[start : start + end]
         try:
-            snippet_count = int(line[start : start + end])
-        except ValueError as err:
+            return int(body)
+        except ValueError:
+            err = ValueError(f"invalid snippet count: {body!r}")
             self._add_debug_note(err, line, line_num)
-            raise
-        return snippet_count
+            raise err
 
     def _add_debug_note(self, err: Exception, line: str, line_num: int) -> None:
         if self.debug:

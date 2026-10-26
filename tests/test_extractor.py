@@ -168,29 +168,30 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
     assert "only one more" in text
 
 
-def test_get_snippet_count_default_one():
+def test_get_snippet_count_after_token_default_one():
     line = "# TODO: x"
-    start = line.index("TODO") + len("TODO")
-    assert Extractor(path=".").get_snippet_count(line, start=start, line_num=1) == 1
+    token_end = line.index("TODO") + len("TODO")
+    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 1
 
 
-def test_get_snippet_count_parses_braces():
+def test_get_snippet_count_after_token_parses_braces():
     line = "# TODO{3} x"
-    assert Extractor(path=".").get_snippet_count(line, start=line.index("{"), line_num=1) == 3
+    token_end = line.index("TODO") + len("TODO")
+    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 3
 
 
 @pytest.mark.parametrize(
-    "content, match",
+    "content",
     [
-        ("# TODO{3 no close\n", "invalid snippet count"),
-        ("# TODO{abc}\n", None),
+        "# TODO{3 no close\n",
+        "# TODO{abc}\n",
     ],
 )
-def test_invalid_snippet_raises(tmp_path, content, match):
+def test_invalid_snippet_raises(tmp_path, content):
     src = tmp_path / "bad.py"
     out = tmp_path / "out.txt"
     src.write_text(content, encoding="utf-8")
-    with pytest.raises(ValueError, match=match):
+    with pytest.raises(ValueError, match="invalid snippet count"):
         Extractor(path=src, out=str(out)).run()
 
 
