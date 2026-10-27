@@ -46,7 +46,7 @@ class Extractor:
 
         self.recursive = recursive
         # the CLI sets max_depth to None if omitted so we need to set the default explicitly
-        self.max_depth = DEFAULT_MAX_DEPTH if max_depth is None else max_depth
+        self.max_depth = self.prepare_max_depth(max_depth)
 
         self.debug = __debug__ and debug
 
@@ -86,6 +86,14 @@ class Extractor:
         if (path := Path(name)).is_dir():
             path = path / DEFAULT_OUT
         return Writer(path, to_stdout=self.tee)
+
+    @staticmethod
+    def prepare_max_depth(max_depth: int | None) -> int:
+        if max_depth is not None:
+            if max_depth <= 0:
+                raise ValueError("max_depth must be a positive integer")
+            return max_depth
+        return DEFAULT_MAX_DEPTH
 
     @cached_property
     def out_path(self) -> Path | None:

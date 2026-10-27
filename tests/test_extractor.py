@@ -3,7 +3,7 @@ import sys
 import pytest
 
 from tests.helpers import broken_pipe_write, patch_stdout_broken_flush, write_good_and_bad
-from todex.extractor import Extractor
+from todex.extractor import DEFAULT_MAX_DEPTH, Extractor
 from todex.writer import StopExtractionError
 
 
@@ -149,6 +149,16 @@ def test_r_m_limits_depth(sample, out, run):
     text = run(sample, out, recursive=True, max_depth=1)
     assert "TODO: deep" in text
     assert "TODO: deeper" not in text
+
+
+@pytest.mark.parametrize("max_depth", [0, -1])
+def test_max_depth_rejects_non_positive(tmp_path, max_depth):
+    with pytest.raises(ValueError, match="max_depth must be a positive integer"):
+        Extractor(path=tmp_path, max_depth=max_depth)
+
+
+def test_max_depth_none_uses_default(tmp_path):
+    assert Extractor(path=tmp_path).max_depth == DEFAULT_MAX_DEPTH
 
 
 def test_without_r_skips_nested(sample, out, run):
