@@ -2,6 +2,7 @@ import sys
 
 import pytest
 
+from tests.helpers import broken_pipe_write, patch_stdout_broken_flush, write_good_and_bad
 from todex.extractor import Extractor
 from todex.writer import StopExtractionError
 
@@ -84,6 +85,23 @@ def test_g_with_x_bang_reincludes_vendor(sample, out, run):
         recursive=True,
     )
     assert "TODO: vendored" in text
+
+
+def test_exclude_spec_defaults_bang_and_comments(tmp_path):
+    out = tmp_path / "out.txt"
+    ext = Extractor(
+        path=tmp_path,
+        out=str(out),
+        exclude=["vendor/", "!vendor/keep.py", "# comment", "", "  "],
+    )
+    spec = ext.exclude_spec
+
+    assert spec.match_file(".hidden.py")
+    assert spec.match_file("__init__.py")
+    assert any(spec.match_files(["vendor", "vendor/"]))
+    assert spec.match_file("vendor/lib.py")
+    assert not spec.match_file("vendor/keep.py")
+    assert not spec.match_file("app.py")
 
 
 def test_g_missing_gitignore_is_noop(sample, run):
@@ -201,16 +219,18 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
     assert "only one more" in text
 
 
-def test_get_snippet_count_after_token_default_one():
-    line = "# TODO: x"
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("# TODO: x", 1),
+        ("# TODO{3} x", 3),
+    ],
+)
+def test_get_snippet_count_after_token(line, expected):
     token_end = line.index("TODO") + len("TODO")
-    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 1
-
-
-def test_get_snippet_count_after_token_parses_braces():
-    line = "# TODO{3} x"
-    token_end = line.index("TODO") + len("TODO")
-    assert Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == 3
+    assert (
+        Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -286,10 +306,7 @@ def test_tee_without_out_uses_todo(sample, monkeypatch, capsys, app_out):
 
 def test_tee_survives_broken_stdout(sample, out, monkeypatch, app_out):
     # pipe reader gone -> stdout fails, file side still gets the full result
-    def boom(_text: str) -> int:
-        raise BrokenPipeError
-
-    monkeypatch.setattr(sys.stdout, "write", boom)
+    monkeypatch.setattr(sys.stdout, "write", broken_pipe_write)
     Extractor(path=sample / "app.py", out=str(out), tee=True).run()
     assert out.read_text(encoding="utf-8") == app_out
 
@@ -298,10 +315,7 @@ def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
     for i in range(5):
         (tmp_path / f"f{i}.py").write_text("# TODO: x\n", encoding="utf-8")
 
-    def boom(_text: str) -> int:
-        raise BrokenPipeError
-
-    monkeypatch.setattr(sys.stdout, "write", boom)
+    monkeypatch.setattr(sys.stdout, "write", broken_pipe_write)
     seen = []
     orig = Extractor.process_file
 
@@ -315,17 +329,54 @@ def test_s_stops_on_broken_stdout(tmp_path, monkeypatch):
     assert len(seen) == 1
 
 
-def test_does_not_rescan_output_file(sample):
+@pytest.mark.parametrize("relative", [False, True], ids=["abs", "relative"])
+def test_does_not_rescan_output_file(sample, monkeypatch, stale_todo, relative):
     # NB: Output path must be skipped so a prior TODO file is not re-ingested
     out = sample / "TODO"
-    out.write_text(
-        "======================\nstale.py\n\tline 1: # TODO: from previous run\n",
-        encoding="utf-8",
-    )
-    Extractor(path=sample, out=str(out), recursive=True).run()
+    out.write_text(stale_todo, encoding="utf-8")
+
+    if relative:
+        monkeypatch.chdir(sample)
+        Extractor(path=".", out="./TODO", recursive=True).run()
+    else:
+        Extractor(path=sample, out=str(out), recursive=True).run()
+
     text = out.read_text(encoding="utf-8")
     assert "TODO: from previous run" not in text
     assert "TODO: main" in text
+
+
+def test_stdout_has_no_out_skip(tmp_path, capsys):
+    todo = tmp_path / "TODO"
+    todo.write_text("# TODO: keep scanning me\n", encoding="utf-8")
+
+    Extractor(path=tmp_path, stdout=True).run()
+
+    assert "TODO: keep scanning me" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "name, content",
+    [("empty.py", ""), ("nl.py", "\n")],
+    ids=["empty", "newline"],
+)
+def test_zero_token_file_empty_out(tmp_path, name, content):
+    src = tmp_path / name
+    src.write_text(content, encoding="utf-8")
+    out = tmp_path / "out.txt"
+
+    Extractor(path=src, out=str(out)).run()
+
+    assert out.read_text(encoding="utf-8") == ""
+
+
+def test_o_equals_scanned_file_truncates(tmp_path):
+    src = tmp_path / "f.py"
+    src.write_text("# TODO: will be truncated\n", encoding="utf-8")
+
+    Extractor(path=src, out=str(src)).run()
+
+    assert src.read_text(encoding="utf-8") == ""
 
 
 def test_zero_hit_scan_truncates_stale_out(tmp_path):
@@ -337,16 +388,66 @@ def test_zero_hit_scan_truncates_stale_out(tmp_path):
     assert out.read_text(encoding="utf-8") == ""
 
 
-def test_skips_undecodable_file_and_continues(tmp_path, capsys, run):
-    (tmp_path / "good.py").write_text("# TODO: keep me\n", encoding="utf-8")
-    (tmp_path / "bad.bin").write_bytes(b"\xff\xfe TODO: binary\n")
-    text = run(tmp_path, tmp_path / "out.txt", debug=True)
+def test_debug_emits_processing_trail(sample, out, capsys):
+    Extractor(path=sample / "app.py", out=str(out), debug=True).run()
+
+    debug_out = capsys.readouterr().out
+    assert debug_out.startswith("processing:\n")
+    assert "\tapp.py\n" in debug_out
+
+
+@pytest.mark.parametrize("debug", [True, False], ids=["debug", "silent"])
+def test_skips_undecodable_file_and_continues(tmp_path, capsys, run, debug):
+    write_good_and_bad(tmp_path)
+
+    text = run(tmp_path, tmp_path / "out.txt", debug=debug)
+
     assert "TODO: keep me" in text
+    err = capsys.readouterr().err
+    if debug:
+        assert "skipping" in err
+        assert "bad.bin" in err
+        assert "utf-8" in err
+    else:
+        assert err == ""
+
+
+def test_skips_undecodable_mid_file_keeps_prior_hits(tmp_path, capsys):
+    src = tmp_path / "mixed.py"
+    # pad so the UTF-8 decoder can emit the hit line before failing later
+    src.write_bytes(b"# TODO: first\n" + b"x" * 10000 + b"\n\xff\xfe bad\n")
+    out = tmp_path / "out.txt"
+
+    Extractor(path=src, out=str(out), debug=True).run()
+    assert "TODO: first" in out.read_text(encoding="utf-8")
 
     err = capsys.readouterr().err
     assert "skipping" in err
-    assert "bad.bin" in err
-    assert "utf-8" in err
+    assert "mixed.py" in err
+
+
+def test_s_stops_on_broken_flush(tmp_path, monkeypatch):
+    (tmp_path / "a.py").write_text("# TODO: x\n", encoding="utf-8")
+    patch_stdout_broken_flush(monkeypatch)
+
+    with pytest.raises(StopExtractionError):
+        Extractor(path=tmp_path, stdout=True).run()
+
+
+def test_tee_survives_broken_flush(sample, out, monkeypatch, app_out):
+    patch_stdout_broken_flush(monkeypatch)
+
+    Extractor(path=sample / "app.py", out=str(out), tee=True).run()
+
+    assert out.read_text(encoding="utf-8") == app_out
+
+
+def test_debug_broken_pipe_raises_broken_pipe(tmp_path, monkeypatch):
+    (tmp_path / "a.py").write_text("# TODO: x\n", encoding="utf-8")
+    monkeypatch.setattr(sys.stdout, "write", broken_pipe_write)
+
+    with pytest.raises(BrokenPipeError):
+        Extractor(path=tmp_path, out=str(tmp_path / "out.txt"), debug=True).run()
 
 
 def test_missing_path_raises(tmp_path):
