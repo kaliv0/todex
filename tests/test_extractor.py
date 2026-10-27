@@ -116,7 +116,7 @@ def test_file_path_g_is_noop_but_still_processes(sample, out, run):
         path=sample / "app.py",
         use_gitignore=True,
         out=str(out),
-    ).get_gitignore_patterns()
+    )._get_gitignore_patterns()
     assert patterns == []
 
     text = run(sample / "app.py", out, use_gitignore=True)
@@ -239,7 +239,7 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
 def test_get_snippet_count_after_token(line, expected):
     token_end = line.index("TODO") + len("TODO")
     assert (
-        Extractor(path=".").get_snippet_count_after_token(line, token_end=token_end, line_num=1) == expected
+        Extractor(path=".")._get_snippet_count_after_token(line, token_end=token_end, line_num=1) == expected
     )
 
 

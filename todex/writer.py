@@ -24,15 +24,15 @@ class Writer:
     def __init__(self, path: Path | None, to_stdout=False) -> None:
         self.path = path
         self.to_stdout = to_stdout
-        self.file = self.prepare_file()
-        self.stdout_writer = self.prepare_stdout_writer()
+        self.file = self._prepare_file()
+        self.stdout_writer = self._prepare_stdout_writer()
 
-    def prepare_file(self) -> TextIO | None:
+    def _prepare_file(self) -> TextIO | None:
         if self.path:
             return self.path.open("w", encoding="utf-8")
         return None
 
-    def prepare_stdout_writer(self) -> PagedStream | TextIO:
+    def _prepare_stdout_writer(self) -> PagedStream | TextIO:
         if self.to_stdout and sys.stdout.isatty():
             return PagedStream()
         return sys.stdout

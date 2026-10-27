@@ -4,7 +4,7 @@ from todex.extractor import Extractor
 
 
 def pattern(tokens=None, ignore_default=False):
-    return Extractor.prepare_token_pattern(tokens or [], ignore_default)
+    return Extractor._prepare_token_pattern(tokens or [], ignore_default)
 
 
 def matched(pat, line: str) -> str | None:
