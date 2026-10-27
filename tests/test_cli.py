@@ -2,6 +2,7 @@ import sys
 
 import pytest
 
+from tests.helpers import broken_pipe_write
 from todex.__main__ import main
 
 
@@ -87,21 +88,23 @@ def test_tee_via_cli(monkeypatch, sample, capsys, app_out):
     assert capsys.readouterr().out == app_out
 
 
-def test_s_broken_pipe_via_debug_exits_141(monkeypatch, sample):
-    def boom(_text: str) -> int:
-        raise BrokenPipeError
-
-    monkeypatch.setattr(sys.stdout, "write", boom)
+@pytest.mark.parametrize(
+    "extra",
+    [["-s", "-d"], ["-s"]],
+    ids=["debug", "write"],
+)
+def test_s_broken_pipe_exits_141(monkeypatch, sample, extra):
+    monkeypatch.setattr(sys.stdout, "write", broken_pipe_write)
     with pytest.raises(SystemExit) as exc:
-        run_main(monkeypatch, [str(sample / "app.py"), "-s", "-d"])
+        run_main(monkeypatch, [str(sample / "app.py"), *extra])
     assert exc.value.code == 141
 
 
-def test_s_broken_pipe_write_exits_141(monkeypatch, sample):
-    def boom(_text: str) -> int:
-        raise BrokenPipeError
+def test_keyboard_interrupt_exits_130(monkeypatch, sample):
+    def boom(*_args, **_kwargs):
+        raise KeyboardInterrupt
 
-    monkeypatch.setattr(sys.stdout, "write", boom)
+    monkeypatch.setattr("todex.__main__.Extractor.run", boom)
     with pytest.raises(SystemExit) as exc:
         run_main(monkeypatch, [str(sample / "app.py"), "-s"])
-    assert exc.value.code == 141
+    assert exc.value.code == 130

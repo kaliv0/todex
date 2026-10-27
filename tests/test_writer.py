@@ -90,3 +90,15 @@ def test_page_preserves_less_when_set(tty, monkeypatch):
     w.write_entry(1, "# TODO: x\n")
     w.close()
     assert os.environ["LESS"] == "X"
+
+
+def test_page_accepts_pager_with_args(tty, monkeypatch, tmp_path):
+    log = tmp_path / "paged.txt"
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setenv("PAGER", f"tee {log}")
+
+    w = Writer(path=None, to_stdout=True)
+    w.write_entry(1, "# TODO: x\n")
+    w.close()
+
+    assert "\tline 1: # TODO: x\n" in log.read_text(encoding="utf-8")

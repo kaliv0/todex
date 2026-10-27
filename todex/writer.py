@@ -24,15 +24,15 @@ class Writer:
     def __init__(self, path: Path | None, to_stdout=False) -> None:
         self.path = path
         self.to_stdout = to_stdout
-        self.file = self.prepare_file()
-        self.stdout_writer = self.prepare_stdout_writer()
+        self.file = self._prepare_file()
+        self.stdout_writer = self._prepare_stdout_writer()
 
-    def prepare_file(self) -> TextIO | None:
+    def _prepare_file(self) -> TextIO | None:
         if self.path:
             return self.path.open("w", encoding="utf-8")
         return None
 
-    def prepare_stdout_writer(self) -> PagedStream | TextIO:
+    def _prepare_stdout_writer(self) -> PagedStream | TextIO:
         if self.to_stdout and sys.stdout.isatty():
             return PagedStream()
         return sys.stdout
@@ -47,8 +47,7 @@ class Writer:
         self.stdout_writer.write(text)
 
     def error(self, text) -> None:
-        # well, it's either extract this and tell the typechecker to f*ck off or...
-        if isinstance(self.stdout_writer, PagedStream):
+        if self._is_paged_stream:
             self.stdout_writer.write(text)
         else:
             sys.stderr.write(text)
@@ -57,11 +56,14 @@ class Writer:
         if self.to_stdout:
             try:
                 self.stdout_writer.write(text)
-                if not isinstance(self.stdout_writer, PagedStream):
-                    self.stdout_writer.flush()
+                if not self._is_paged_stream:
+                    self.stdout_writer.flush()  # type:ignore
             except BrokenPipeError:
                 self.to_stdout = False
-                self.stdout_writer = sys.stdout
+                if self._is_paged_stream:
+                    # drop pager so close() won't page() a partial buffer
+                    self.stdout_writer = sys.stdout
+
                 if self.path is None:
                     raise StopExtractionError
 
@@ -70,9 +72,13 @@ class Writer:
             self.file.flush()
 
     def close(self) -> None:
-        if isinstance(self.stdout_writer, PagedStream):
-            self.stdout_writer.page()
+        if self._is_paged_stream:
+            self.stdout_writer.page()  # type:ignore
 
         if self.file:
             self.file.close()
             self.file = None  # for just in case
+
+    @property
+    def _is_paged_stream(self) -> bool:
+        return isinstance(self.stdout_writer, PagedStream)

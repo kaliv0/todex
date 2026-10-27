@@ -4,7 +4,7 @@ from todex.extractor import Extractor
 
 
 def pattern(tokens=None, ignore_default=False):
-    return Extractor.prepare_token_pattern(tokens or [], ignore_default)
+    return Extractor._prepare_token_pattern(tokens or [], ignore_default)
 
 
 def matched(pat, line: str) -> str | None:
@@ -62,6 +62,22 @@ def test_prefers_longer_token():
     pat = pattern(["FIX", "FIXME"], ignore_default=True)
     assert matched(pat, "FIXME: later") == "FIXME"
     assert matched(pat, "FIX: now") == "FIX"
+
+
+def test_overlap_leftmost_longest():
+    pat = pattern(["AB", "ABC", "BC"], ignore_default=True)
+    assert matched(pat, " ABC ") == "ABC"
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("中文标记: alone", "中文标记"),
+        ("前中文标记后", None),
+    ],
+)
+def test_non_ascii_token_boundary(line, expected):
+    assert matched(pattern(["中文标记"], ignore_default=True), line) == expected
 
 
 @pytest.mark.parametrize(

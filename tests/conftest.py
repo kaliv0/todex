@@ -14,6 +14,11 @@ def app_out() -> str:
 
 
 @pytest.fixture
+def stale_todo() -> str:
+    return "======================\nstale.py\n\tline 1: # TODO: from previous run\n"
+
+
+@pytest.fixture
 def sample(tmp_path: Path) -> Path:
     # copy the sample project tree into an isolated temp dir
     dest = tmp_path / "project"

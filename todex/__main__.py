@@ -167,7 +167,7 @@ the extractor will include multiline snippet with the length specified between t
         "--max-depth",
         type=require_positive_int,
         metavar="N",
-        help="maximum depth of dir traversal - used with -r/--recursive flag",
+        help="maximum depth of dir traversal - used with -r/--recursive flag (default: 120)",
     )
     parser.add_argument(
         "-d",

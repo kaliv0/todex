@@ -34,24 +34,24 @@ class Extractor:
         debug: bool = False,
     ) -> None:
         self.root = Path(path)
-        self.token_pattern = self.prepare_token_pattern(tokens or [], ignore_default)
-        self.exclude_spec = self.prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
+        self.token_pattern = self._prepare_token_pattern(tokens or [], ignore_default)
+        self.exclude_spec = self._prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
 
         self.stdout = stdout
         self.tee = tee
-        self.out = self.prepare_out_writer(out or DEFAULT_OUT)
+        self.out = self._prepare_out_writer(out or DEFAULT_OUT)
 
         self.full_path = full_path
         self.concise = concise
 
         self.recursive = recursive
         # the CLI sets max_depth to None if omitted so we need to set the default explicitly
-        self.max_depth = DEFAULT_MAX_DEPTH if max_depth is None else max_depth
+        self.max_depth = self._prepare_max_depth(max_depth)
 
         self.debug = __debug__ and debug
 
     @staticmethod
-    def prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
+    def _prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
         if not ignore_default:
             tokens = [*DEFAULT_TOKENS, *tokens]
 
@@ -63,9 +63,11 @@ class Extractor:
         alternations = "|".join(re.escape(tok) for tok in tokens)
         return re.compile(rf"(?<!\w)(?:{alternations})(?!\w)", re.IGNORECASE)
 
-    def prepare_exclude_spec(self, exclude: list[str], include_hidden: bool, use_gitignore: bool) -> PathSpec:
+    def _prepare_exclude_spec(
+        self, exclude: list[str], include_hidden: bool, use_gitignore: bool
+    ) -> PathSpec:
         if use_gitignore and self.root.is_dir():
-            exclude = [*self.get_gitignore_patterns(), *exclude]
+            exclude = [*self._get_gitignore_patterns(), *exclude]
 
         if not include_hidden:
             exclude = [*DEFAULT_GLOBS, *exclude]
@@ -74,12 +76,12 @@ class Extractor:
         # NB: ignores blank/# lines from .gitignore file
         return PathSpec.from_lines("gitignore", exclude)
 
-    def get_gitignore_patterns(self) -> list[str]:
+    def _get_gitignore_patterns(self) -> list[str]:
         if (gitignore_file := self.root / ".gitignore").is_file():
             return gitignore_file.read_text(encoding="utf-8").splitlines()
         return []
 
-    def prepare_out_writer(self, name: str) -> Writer:
+    def _prepare_out_writer(self, name: str) -> Writer:
         if self.stdout:
             return Writer(path=None, to_stdout=True)
 
@@ -87,8 +89,16 @@ class Extractor:
             path = path / DEFAULT_OUT
         return Writer(path, to_stdout=self.tee)
 
+    @staticmethod
+    def _prepare_max_depth(max_depth: int | None) -> int:
+        if max_depth is None:
+            return DEFAULT_MAX_DEPTH
+        if max_depth <= 0:
+            raise ValueError("max_depth must be a positive integer")
+        return max_depth
+
     @cached_property
-    def out_path(self) -> Path | None:
+    def _out_path(self) -> Path | None:
         if self.out.path is None:
             return None
         return self.out.path.absolute()
@@ -112,11 +122,11 @@ class Extractor:
             self.out.close()
 
     def process_file(self, path: Path) -> None:
-        if self.is_excluded(path):
+        if self._is_excluded(path):
             return
 
         if self.debug:
-            self.out.debug(f"\t{self.prepare_path_name(path)}\n")
+            self.out.debug(f"\t{self._prepare_path_name(path)}\n")
         try:
             with path.open(encoding="utf-8") as f:
                 lines_count = 0
@@ -125,14 +135,14 @@ class Extractor:
                     lines_count += 1
                     if not (match := self.token_pattern.search(line)):
                         continue
-                    lines_count, header_added = self.write_hit(
+                    lines_count, header_added = self._write_hit(
                         f, path, line, lines_count, match, header_added
                     )
         except UnicodeDecodeError as e:
             if self.debug:
-                self.out.error(f"skipping {self.prepare_path_name(path)}:\n{e}\n")
+                self.out.error(f"skipping {self._prepare_path_name(path)}:\n{e}\n")
 
-    def write_hit(
+    def _write_hit(
         self,
         source: TextIO,
         path: Path,
@@ -142,10 +152,10 @@ class Extractor:
         header_added: bool,
     ) -> tuple[int, bool]:
         if not header_added:
-            self.out.write_header(self.prepare_path_name(path))
+            self.out.write_header(self._prepare_path_name(path))
             header_added = True
 
-        snippet_count = self.get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
+        snippet_count = self._get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
         if self.concise:
             self.out.write_entry(lines_count, line[match.start() :])
             return lines_count, header_added
@@ -159,19 +169,19 @@ class Extractor:
 
         self.out.write_entry(
             display_line_num,
-            self.format_snippet_entry(line, multi=display_line_num != lines_count),
+            self._format_snippet_entry(line, multi=display_line_num != lines_count),
         )
         return lines_count, header_added
 
     @staticmethod
-    def format_snippet_entry(line: str, multi: bool) -> str:
+    def _format_snippet_entry(line: str, multi: bool) -> str:
         if not line.endswith("\n"):
             line += "\n"  # this is the last or only line in the file
         if multi:
             return indent(dedent("\n" + line), "\t\t")
         return dedent(line)
 
-    def get_snippet_count_after_token(self, line: str, token_end: int, line_num: int) -> int:
+    def _get_snippet_count_after_token(self, line: str, token_end: int, line_num: int) -> int:
         if not line.startswith("{", token_end):
             return 1
 
@@ -194,7 +204,7 @@ class Extractor:
         if self.debug:
             err.add_note(f"\tline {line_num}: {line.strip()}")
 
-    def prepare_path_name(self, path: Path) -> str:
+    def _prepare_path_name(self, path: Path) -> str:
         if self.full_path:
             return str(path.absolute())
         if self.recursive:
@@ -202,7 +212,7 @@ class Extractor:
         return path.name
 
     def process_dir(self, path: Path, depth: int) -> None:
-        if self.is_excluded(path, is_dir=True) or depth > self.max_depth:
+        if self._is_excluded(path, is_dir=True) or depth > self.max_depth:
             return
 
         opts = {"follow_symlinks": False}
@@ -216,13 +226,13 @@ class Extractor:
         for dir_ in dirs:
             self.process_dir(dir_, depth + 1)
 
-    def is_excluded(self, path: Path, is_dir: bool = False) -> bool:
+    def _is_excluded(self, path: Path, is_dir: bool = False) -> bool:
         # always process scan root
         if path == self.root:
             return False
 
         # skip summary file
-        if path.absolute() == self.out_path:
+        if path.absolute() == self._out_path:
             return True
 
         rel_path = path.relative_to(self.root).as_posix()
