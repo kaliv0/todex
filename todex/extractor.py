@@ -91,11 +91,11 @@ class Extractor:
 
     @staticmethod
     def _prepare_max_depth(max_depth: int | None) -> int:
-        if max_depth is not None:
-            if max_depth <= 0:
-                raise ValueError("max_depth must be a positive integer")
-            return max_depth
-        return DEFAULT_MAX_DEPTH
+        if max_depth is None:
+            return DEFAULT_MAX_DEPTH
+        if max_depth <= 0:
+            raise ValueError("max_depth must be a positive integer")
+        return max_depth
 
     @cached_property
     def _out_path(self) -> Path | None:
