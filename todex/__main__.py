@@ -105,7 +105,7 @@ def main() -> None:
         "--tokens",
         nargs="+",
         metavar="TOKEN",
-        help="""list of tokens to search for (together with default TODO, FIXME) e.g. WARN, REVISIT.
+        help="""list of tokens to search for (combined with default TODO, FIXME) e.g. WARN, REVISIT.
 If the token is followed by {lines-count} e.g. #FIXME{3}
 the extractor will include multiline snippet with the length specified between the curly braces:
 
@@ -126,7 +126,7 @@ the extractor will include multiline snippet with the length specified between t
         "--exclude",
         nargs="+",
         metavar="PATTERN",
-        help="""git-like patterns to skip (paths, names, or globs together with default .* / __*), e.g.
+        help="""git-like patterns to skip (paths, names, or globs - combined with default .* / __*), e.g.
 
     bar.py       any file named bar.py
     /bar.py      only top-level

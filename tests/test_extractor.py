@@ -401,9 +401,10 @@ def test_zero_hit_scan_truncates_stale_out(tmp_path):
 def test_debug_emits_processing_trail(sample, out, capsys):
     Extractor(path=sample / "app.py", out=str(out), debug=True).run()
 
-    debug_out = capsys.readouterr().out
-    assert debug_out.startswith("processing:\n")
-    assert "\tapp.py\n" in debug_out
+    text = out.read_text(encoding="utf-8")
+    assert text.startswith("processing:\n")
+    assert "\tapp.py\n" in text
+    assert capsys.readouterr().out == ""
 
 
 @pytest.mark.parametrize("debug", [True, False], ids=["debug", "silent"])
@@ -452,12 +453,12 @@ def test_tee_survives_broken_flush(sample, out, monkeypatch, app_out):
     assert out.read_text(encoding="utf-8") == app_out
 
 
-def test_debug_broken_pipe_raises_broken_pipe(tmp_path, monkeypatch):
+def test_debug_broken_pipe_raises_stop_extraction(tmp_path, monkeypatch):
     (tmp_path / "a.py").write_text("# TODO: x\n", encoding="utf-8")
     monkeypatch.setattr(sys.stdout, "write", broken_pipe_write)
 
-    with pytest.raises(BrokenPipeError):
-        Extractor(path=tmp_path, out=str(tmp_path / "out.txt"), debug=True).run()
+    with pytest.raises(StopExtractionError):
+        Extractor(path=tmp_path, stdout=True, debug=True).run()
 
 
 def test_missing_path_raises(tmp_path):

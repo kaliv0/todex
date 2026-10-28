@@ -44,7 +44,7 @@ class Writer:
         self._write(f"\tline {lines_count}: {line}")
 
     def debug(self, text) -> None:
-        self.stdout_writer.write(text)
+        self._write(text)
 
     def error(self, text) -> None:
         if self._is_paged_stream:
