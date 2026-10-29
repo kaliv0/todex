@@ -98,10 +98,8 @@ class Extractor:
         return max_depth
 
     @cached_property
-    def _out_path(self) -> Path | None:
-        if self.out.path is None:
-            return None
-        return self.out.path.absolute()
+    def out_path(self) -> Path | None:
+        return self.out.path and self.out.path.absolute()
 
     def run(self) -> None:
         if not self.root.exists():
@@ -230,12 +228,11 @@ class Extractor:
         # always process scan root
         if path == self.root:
             return False
-
         # skip summary file
-        if path.absolute() == self._out_path:
+        if path.absolute() == self.out_path:
             return True
 
-        rel_path = path.relative_to(self.root).as_posix()
+        rel_paths = [rel := path.relative_to(self.root).as_posix()]
         if is_dir:
-            return any(self.exclude_spec.match_files([rel_path, rel_path + "/"]))
-        return self.exclude_spec.match_file(rel_path)
+            rel_paths.append(rel + "/")
+        return any(self.exclude_spec.match_files(rel_paths))
