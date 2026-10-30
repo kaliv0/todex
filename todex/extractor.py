@@ -33,7 +33,7 @@ class Extractor:
         max_depth: int | None = None,
         debug: bool = False,
     ) -> None:
-        self.root = Path(path)
+        self.root = self._prepare_root(path)
         self.token_pattern = self._prepare_token_pattern(tokens or [], ignore_default)
         self.exclude_spec = self._prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
 
@@ -49,6 +49,12 @@ class Extractor:
         self.max_depth = self._prepare_max_depth(max_depth)
 
         self.debug = __debug__ and debug
+
+    @staticmethod
+    def _prepare_root(path: str) -> Path:
+        if not (root := Path(path)).exists():
+            raise FileNotFoundError(f"{root} not found")
+        return root
 
     @staticmethod
     def _prepare_token_pattern(tokens: list[str], ignore_default: bool) -> Pattern:
@@ -102,13 +108,11 @@ class Extractor:
         return self.out.path and self.out.path.absolute()
 
     def run(self) -> None:
-        if not self.root.exists():
-            raise FileNotFoundError(f"{self.root} not found")
-
-        if self.debug:
-            # it could be simple print() but don't want to mix both out of superstition
-            self.out.debug("processing:\n")
         try:
+            if self.debug:
+                # it could be simple print() but don't want to mix both out of superstition
+                self.out.debug("processing:\n")
+
             if self.root.is_file():
                 self.process_file(self.root)
             elif self.root.is_dir():

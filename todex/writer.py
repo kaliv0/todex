@@ -29,6 +29,9 @@ class Writer:
 
     def _prepare_file(self) -> TextIO | None:
         if self.path:
+            # we open file early - even if no tokens were found,
+            # out file is left truncated with no potentially stale data
+            # -> other option would be to open lazily on first write attempt
             return self.path.open("w", encoding="utf-8")
         return None
 
