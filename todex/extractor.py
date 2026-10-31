@@ -37,9 +37,7 @@ class Extractor:
         self.token_pattern = self._prepare_token_pattern(tokens or [], ignore_default)
         self.exclude_spec = self._prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
 
-        self.stdout = stdout
-        self.tee = tee
-        self.out = self._prepare_out_writer(out or DEFAULT_OUT)
+        self.out = self._prepare_out_writer(out or DEFAULT_OUT, stdout, tee)
 
         self.full_path = full_path
         self.concise = concise
@@ -87,13 +85,13 @@ class Extractor:
             return gitignore_file.read_text(encoding="utf-8").splitlines()
         return []
 
-    def _prepare_out_writer(self, name: str) -> Writer:
-        if self.stdout:
+    def _prepare_out_writer(self, name: str, stdout: bool, tee: bool) -> Writer:
+        if stdout:
             return Writer(path=None, to_stdout=True)
 
         if (path := Path(name)).is_dir():
             path = path / DEFAULT_OUT
-        return Writer(path, to_stdout=self.tee)
+        return Writer(path, to_stdout=tee)
 
     @staticmethod
     def _prepare_max_depth(max_depth: int | None) -> int:
