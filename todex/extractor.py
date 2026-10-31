@@ -36,16 +36,12 @@ class Extractor:
         self.root = self._prepare_root(path)
         self.token_pattern = self._prepare_token_pattern(tokens or [], ignore_default)
         self.exclude_spec = self._prepare_exclude_spec(exclude or [], include_hidden, use_gitignore)
-
-        self.out = self._prepare_out_writer(out or DEFAULT_OUT, stdout, tee)
-
-        self.full_path = full_path
-        self.concise = concise
-
-        self.recursive = recursive
         # the CLI sets max_depth to None if omitted so we need to set the default explicitly
         self.max_depth = self._prepare_max_depth(max_depth)
-
+        self.out = self._prepare_out_writer(out or DEFAULT_OUT, stdout, tee)
+        self.full_path = full_path
+        self.concise = concise
+        self.recursive = recursive
         self.debug = __debug__ and debug
 
     @staticmethod
