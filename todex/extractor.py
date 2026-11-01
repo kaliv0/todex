@@ -124,8 +124,9 @@ class Extractor:
         if self._is_excluded(path):
             return
 
+        display_name = self._prepare_path_name(path)
         if self.debug:
-            self.out.debug(f"\t{self._prepare_path_name(path)}\n")
+            self.out.debug(f"\t{display_name}\n")
         try:
             with path.open(encoding="utf-8") as f:
                 lines_count = 0
@@ -135,23 +136,23 @@ class Extractor:
                     if not (match := self.token_pattern.search(line)):
                         continue
                     lines_count, header_added = self._write_hit(
-                        f, path, line, lines_count, match, header_added
+                        f, display_name, line, lines_count, match, header_added
                     )
         except UnicodeDecodeError as e:
             if self.debug:
-                self.out.error(f"skipping {self._prepare_path_name(path)}:\n{e}\n")
+                self.out.error(f"skipping {display_name}:\n{e}\n")
 
     def _write_hit(
         self,
         source: TextIO,
-        path: Path,
+        display_name: str,
         line: str,
         lines_count: int,
         match: re.Match[str],
         header_added: bool,
     ) -> tuple[int, bool]:
         if not header_added:
-            self.out.write_header(self._prepare_path_name(path))
+            self.out.write_header(display_name)
             header_added = True
 
         snippet_count = self._get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
