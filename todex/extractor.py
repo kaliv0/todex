@@ -46,7 +46,10 @@ class Extractor:
 
     @staticmethod
     def _prepare_root(path: str) -> Path:
-        if not (root := Path(path)).exists():
+        root = Path(path)
+        if root.is_symlink():
+            raise ValueError(f"{root} is a symlink")
+        if not root.exists():
             raise FileNotFoundError(f"{root} not found")
         return root
 

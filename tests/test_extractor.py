@@ -198,6 +198,20 @@ def test_symlink_not_followed(tmp_path, link_name, target_is_dir, recursive, hid
     assert hidden not in text
 
 
+@pytest.mark.parametrize("target_is_dir", [False, True], ids=["file", "dir"])
+def test_symlink_path_raises(tmp_path, target_is_dir):
+    target = tmp_path / ("dir" if target_is_dir else "file.py")
+    if target_is_dir:
+        target.mkdir()
+        (target / "x.py").write_text("# TODO: x\n", encoding="utf-8")
+    else:
+        target.write_text("# TODO: x\n", encoding="utf-8")
+    link = tmp_path / ("linkdir" if target_is_dir else "link.py")
+    link.symlink_to(target)
+    with pytest.raises(ValueError, match="is a symlink"):
+        Extractor(path=link, out=str(tmp_path / "out.txt"))
+
+
 # --- concise / snippets ---
 def test_c_omits_snippet_body(sample, out, run):
     text = run(sample / "snippet.py", out, concise=True)
