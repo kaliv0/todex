@@ -253,7 +253,8 @@ def test_snippet_past_eof_does_not_crash(tmp_path, run):
 def test_get_snippet_count_after_token(line, expected):
     token_end = line.index("TODO") + len("TODO")
     assert (
-        Extractor(path=".")._get_snippet_count_after_token(line, token_end=token_end, line_num=1) == expected
+        Extractor(path=".")._get_snippet_count_after_token("Myfile", line, token_end=token_end, line_num=1)
+        == expected
     )
 
 

@@ -155,7 +155,9 @@ class Extractor:
             self.out.write_header(display_name)
             header_added = True
 
-        snippet_count = self._get_snippet_count_after_token(line, token_end=match.end(), line_num=lines_count)
+        snippet_count = self._get_snippet_count_after_token(
+            display_name, line, token_end=match.end(), line_num=lines_count
+        )
         if self.concise:
             self.out.write_entry(lines_count, line[match.start() :])
             return lines_count, header_added
@@ -181,7 +183,9 @@ class Extractor:
             return indent(dedent("\n" + line), "\t\t")
         return dedent(line)
 
-    def _get_snippet_count_after_token(self, line: str, token_end: int, line_num: int) -> int:
+    def _get_snippet_count_after_token(
+        self, display_name: str, line: str, token_end: int, line_num: int
+    ) -> int:
         if not line.startswith("{", token_end):
             return 1
 
@@ -189,7 +193,7 @@ class Extractor:
         start = token_end + 1
         if (end := line[start:].find("}")) == -1:
             err = ValueError("invalid snippet count: unclosed '{'")
-            self._add_debug_note(err, line, line_num)
+            self._add_debug_note(err, display_name, line, line_num)
             raise err
 
         body = line[start : start + end]
@@ -197,12 +201,12 @@ class Extractor:
             return int(body)
         except ValueError:
             err = ValueError(f"invalid snippet count: {body!r}")
-            self._add_debug_note(err, line, line_num)
+            self._add_debug_note(err, display_name, line, line_num)
             raise err
 
-    def _add_debug_note(self, err: Exception, line: str, line_num: int) -> None:
+    def _add_debug_note(self, err: Exception, display_name: str, line: str, line_num: int) -> None:
         if self.debug:
-            err.add_note(f"\tline {line_num}: {line.strip()}")
+            err.add_note(f"\tfile {display_name}\n\tline {line_num}: {line.strip()}")
 
     def _prepare_path_name(self, path: Path) -> str:
         if self.full_path:
